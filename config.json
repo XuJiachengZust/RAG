@@ -1,0 +1,132 @@
+{
+  "api": {
+    "openai_api_key": "${OPENAI_API_KEY}",
+    "openai_base_url": "${OPENAI_BASE_URL:https://api.openai.com/v1}",
+    "model_name": "${MODEL_NAME:gpt-3.5-turbo}",
+    "embedding_model": "${EMBEDDING_MODEL:text-embedding-ada-002}"
+  },
+  "langsmith": {
+    "api_key": "${LANGSMITH_API_KEY}",
+    "project_name": "${LANGSMITH_PROJECT:agent-conversation-graph}",
+    "endpoint": "${LANGSMITH_ENDPOINT:https://api.smith.langchain.com}",
+    "enabled": "${LANGSMITH_ENABLED:false}",
+    "trace_sample_rate": "${LANGSMITH_TRACE_SAMPLE_RATE:1.0}"
+  },
+  "model": {
+    "temperature": "${MODEL_TEMPERATURE:0.3}",
+    "max_tokens": "${MAX_TOKENS:2000}",
+    "conversation_temperature": "${CONVERSATION_TEMPERATURE:0.1}",
+    "parameter_analysis_temperature": "${PARAMETER_ANALYSIS_TEMPERATURE:0.3}"
+  },
+  "chunking": {
+    "chunk_size": "${CHUNK_SIZE:1000}",
+    "chunk_overlap": "${CHUNK_OVERLAP:200}",
+    "max_chunk_size": "${MAX_CHUNK_SIZE:4000}",
+    "preserve_table_integrity": "${PRESERVE_TABLE_INTEGRITY:true}",
+    "hybrid_chunking": "${HYBRID_CHUNKING:true}",
+    "use_enhanced_processor": "${USE_ENHANCED_PROCESSOR:true}",
+    "semantic_chunker": {
+      "breakpoint_threshold_type": "${BREAKPOINT_THRESHOLD_TYPE:percentile}",
+      "breakpoint_threshold_amount": "${BREAKPOINT_THRESHOLD_AMOUNT:95}",
+      "number_of_chunks": "${NUMBER_OF_CHUNKS:null}",
+      "buffer_size": "${BUFFER_SIZE:1}",
+      "sentence_split_regex": "${SENTENCE_SPLIT_REGEX:(?<=[.!?])\\s+}",
+      "enable_metadata_enhancement": "${ENABLE_METADATA_ENHANCEMENT:true}",
+      "preserve_document_structure": "${PRESERVE_DOCUMENT_STRUCTURE:true}",
+      "min_chunk_size": "${MIN_CHUNK_SIZE:100}",
+      "max_chunk_size": "${SEMANTIC_MAX_CHUNK_SIZE:4000}"
+    },
+    "metadata_enhancer": {
+      "enable_page_range_detection": "${ENABLE_PAGE_RANGE_DETECTION:true}",
+      "enable_title_hierarchy": "${ENABLE_TITLE_HIERARCHY:true}",
+      "enable_content_type_detection": "${ENABLE_CONTENT_TYPE_DETECTION:true}",
+      "enable_statistics_calculation": "${ENABLE_STATISTICS_CALCULATION:true}",
+      "confidence_threshold": "${CONFIDENCE_THRESHOLD:0.7}",
+      "max_title_levels": "${MAX_TITLE_LEVELS:6}",
+      "content_type_keywords": {
+        "table": ["表", "Table", "列", "行", "数据"],
+        "list": ["列表", "清单", "项目", "条目"],
+        "code": ["代码", "函数", "class", "def", "import"],
+        "formula": ["公式", "计算", "方程", "算法"]
+      }
+    },
+    "multimodal": {
+      "enable_multimodal": "${ENABLE_MULTIMODAL:true}",
+      "use_multimodal_for_pdf": "${USE_MULTIMODAL_FOR_PDF:true}",
+      "model_name": "${MULTIMODAL_MODEL:gpt-4o-mini}",
+      "max_tokens": "${MULTIMODAL_MAX_TOKENS:1000}",
+      "temperature": "${MULTIMODAL_TEMPERATURE:0.1}",
+      "image_quality": "${IMAGE_QUALITY:high}",
+      "image_detail": "${IMAGE_DETAIL:high}",
+      "dpi": "${PDF_DPI:150}",
+      "enable_image_extraction": "${ENABLE_IMAGE_EXTRACTION:true}",
+      "enable_table_extraction": "${ENABLE_TABLE_EXTRACTION:true}",
+      "enable_layout_analysis": "${ENABLE_LAYOUT_ANALYSIS:true}",
+      "fallback_to_traditional": "${FALLBACK_TO_TRADITIONAL:true}",
+      "max_image_size": "${MAX_IMAGE_SIZE:2048}",
+      "supported_formats": ["png", "jpeg", "jpg", "webp"],
+      "processing_timeout": "${MULTIMODAL_TIMEOUT:60}",
+      "retry_attempts": "${MULTIMODAL_RETRY:3}",
+      "batch_size": "${MULTIMODAL_BATCH_SIZE:5}"
+    }
+  },
+  "paths": {
+    "knowledge_docs_path": "${KNOWLEDGE_DOCS_PATH:rules}",
+    "parameter_docs_path": "${PARAMETER_DOCS_PATH:data/parameters}",
+    "conversations_path": "${CONVERSATIONS_PATH:data/conversations}",
+    "vector_store_path": "${VECTOR_STORE_PATH:data/vector_stores}",
+    "cache_dir": "${CACHE_DIR:.cache}",
+    "logs_dir": "${LOGS_DIR:logs}"
+  },
+  "embedding": {
+    "model_name": "${EMBEDDING_MODEL:text-embedding-ada-002}",
+    "chunk_size": "${EMBEDDING_CHUNK_SIZE:1000}",
+    "batch_size": "${EMBEDDING_BATCH_SIZE:10}"
+  },
+  "retrieval": {
+    "k": "${RETRIEVAL_K:5}",
+    "score_threshold": "${SCORE_THRESHOLD:0.7}",
+    "search_type": "${SEARCH_TYPE:similarity}"
+  },
+  "chroma": {
+    "distance_function": "${CHROMA_DISTANCE_FUNCTION:cosine}",
+    "collection_name": "${CHROMA_COLLECTION_NAME:rules_collection}",
+    "persist_directory": "${CHROMA_PERSIST_DIR:.cache/chroma}"
+  },
+  "logging": {
+    "level": "${LOG_LEVEL:INFO}",
+    "format": "${LOG_FORMAT:%(asctime)s - %(name)s - %(levelname)s - %(message)s}",
+    "file": "${LOG_FILE:logs/application.log}",
+    "max_file_size": "${LOG_MAX_FILE_SIZE:10MB}",
+    "backup_count": "${LOG_BACKUP_COUNT:5}"
+  },
+  "web": {
+    "host": "${WEB_HOST:localhost}",
+    "port": "${WEB_PORT:5000}",
+    "debug": "${WEB_DEBUG:false}"
+  },
+  "processing": {
+    "batch_size": "${BATCH_SIZE:10}",
+    "max_workers": "${MAX_WORKERS:4}",
+    "timeout": "${PROCESSING_TIMEOUT:300}"
+  },
+  "features": {
+    "enable_conversation_history": "${ENABLE_CONVERSATION_HISTORY:true}",
+    "enable_parameter_matching": "${ENABLE_PARAMETER_MATCHING:true}",
+    "enable_knowledge_retrieval": "${ENABLE_KNOWLEDGE_RETRIEVAL:true}",
+    "enable_web_interface": "${ENABLE_WEB_INTERFACE:true}"
+  },
+  "vector_store": {
+    "clear_on_startup": "${CLEAR_VECTOR_STORE_ON_STARTUP:true}"
+  },
+  "sampling": {
+    "enable_chunk_sampling": "${ENABLE_CHUNK_SAMPLING:true}",
+    "chunk_sample_size": "${CHUNK_SAMPLE_SIZE:100}",
+    "chunk_sample_output_path": "${CHUNK_SAMPLE_OUTPUT_PATH:./chunk_samples.txt}"
+  },
+  "paths": {
+    "knowledge_docs_path": "${KNOWLEDGE_DOCS_PATH:./rules}",
+    "vector_store_path": "${VECTOR_STORE_PATH:./vector_store}",
+    "logs_path": "${LOGS_PATH:./logs}"
+  }
+}

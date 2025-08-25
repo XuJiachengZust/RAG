@@ -1,0 +1,47 @@
+/.cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+rules/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+vector_store/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+chroma_db_parameter/
+chroma_db_knowledge/
+chroma_db_rules/
+# Excel temporary files
+~$*.xlsx
+~$*.xls
+~$*.ppt
+~$*.doc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
