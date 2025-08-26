@@ -3,12 +3,16 @@
 负责基于检索到的文档生成高质量答案。
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+import re
+import logging
 
 from ..state import SelfCorrectiveRAGState
 from ..utils import get_llm_client, evaluate_answer_quality, format_documents_for_context
+from ...core.prompt_manager import prompt_manager
 
 
 def generate_answer_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
@@ -50,7 +54,7 @@ def generate_answer_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
             return generate_no_documents_response(state, query)
         
         # 获取生成模型
-        generator_llm = get_llm_client("gpt-4")
+        generator_llm = get_llm_client(node_type="generation")
         
         if not generator_llm:
             return {
@@ -118,89 +122,39 @@ def create_generation_prompt(query_intent: str, complexity_level: str) -> ChatPr
     Returns:
         生成提示模板
     """
-    # 基础系统提示
-    base_system_prompt = (
-        "你是一个专业的知识助手，能够基于提供的文档内容准确回答用户问题。\n"
-        "请遵循以下原则：\n"
-        "1. 只基于提供的上下文信息回答问题\n"
-        "2. 如果上下文中没有相关信息，请明确说明\n"
-        "3. 保持答案准确、完整、易懂\n"
-        "4. 使用清晰的结构组织答案\n"
-        "5. 适当引用原文支持你的回答"
-    )
-    
-    # 根据意图调整提示
-    intent_specific_prompts = {
-        "definition": (
-            "\n\n针对定义类问题，请：\n"
-            "- 提供清晰准确的定义\n"
-            "- 解释关键概念和术语\n"
-            "- 如有必要，提供示例说明"
-        ),
-        "how_to": (
-            "\n\n针对操作指导类问题，请：\n"
-            "- 提供具体的步骤说明\n"
-            "- 按逻辑顺序组织内容\n"
-            "- 包含重要的注意事项\n"
-            "- 使用编号或项目符号列出步骤"
-        ),
-        "comparison": (
-            "\n\n针对比较类问题，请：\n"
-            "- 明确比较的维度\n"
-            "- 列出各选项的优缺点\n"
-            "- 提供客观的分析\n"
-            "- 如可能，给出推荐建议"
-        ),
-        "best_practice": (
-            "\n\n针对最佳实践类问题，请：\n"
-            "- 提供经过验证的方法\n"
-            "- 解释为什么这些是最佳实践\n"
-            "- 包含实施建议\n"
-            "- 提及常见的陷阱或注意事项"
-        ),
-        "troubleshooting": (
-            "\n\n针对问题解决类问题，请：\n"
-            "- 分析问题的可能原因\n"
-            "- 提供系统性的解决方案\n"
-            "- 按优先级排列解决步骤\n"
-            "- 包含预防措施"
-        ),
-        "list": (
-            "\n\n针对列表类问题，请：\n"
-            "- 提供完整的列表\n"
-            "- 为每个项目提供简要说明\n"
-            "- 按重要性或逻辑顺序排列\n"
-            "- 确保列表的完整性"
-        ),
-        "explanation": (
-            "\n\n针对解释类问题，请：\n"
-            "- 提供深入的解释\n"
-            "- 解释因果关系\n"
-            "- 使用类比或示例帮助理解\n"
-            "- 涵盖相关的背景信息"
-        )
-    }
-    
-    # 根据复杂度调整
-    complexity_adjustments = {
-        "simple": "\n\n请保持答案简洁明了，重点突出。",
-        "medium": "\n\n请提供适度详细的答案，平衡完整性和可读性。",
-        "complex": "\n\n请提供全面详细的答案，涵盖各个方面和细节。"
-    }
-    
-    # 组合系统提示
-    system_prompt = base_system_prompt
-    system_prompt += intent_specific_prompts.get(query_intent, "")
-    system_prompt += complexity_adjustments.get(complexity_level, "")
-    
-    # 创建提示模板
-    return ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", 
-         "上下文信息：\n{context}\n\n"
-         "用户问题：{query}\n\n"
-         "请基于上述上下文信息回答用户问题。")
-    ])
+    try:
+        # 从配置中获取基础系统提示
+        base_system_prompt = prompt_manager.get_prompt('generation', 'base_system_prompt')
+        
+        # 获取意图特定的提示
+        intent_prompt = prompt_manager.get_prompt('generation', f'intent_prompts.{query_intent}', default='')
+        
+        # 获取复杂度调整提示
+        complexity_prompt = prompt_manager.get_prompt('generation', f'complexity_adjustments.{complexity_level}', default='')
+        
+        # 获取用户模板
+        user_template = prompt_manager.get_prompt('generation', 'user_template')
+        
+        # 组合系统提示
+        system_prompt = base_system_prompt
+        if intent_prompt:
+            system_prompt += f"\n\n{intent_prompt}"
+        if complexity_prompt:
+            system_prompt += f"\n\n{complexity_prompt}"
+        
+        # 创建提示模板
+        return ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", user_template)
+        ])
+        
+    except Exception as e:
+        # 如果配置加载失败，使用默认的简化版本
+        print(f"Warning: Failed to load generation prompts from config: {e}")
+        return ChatPromptTemplate.from_messages([
+            ("system", "你是一个专业的知识助手，能够基于提供的上下文信息准确回答用户问题。请确保答案准确、完整、有条理。"),
+            ("human", "上下文信息：\n{context}\n\n用户问题：{query}\n\n请基于上述上下文信息回答用户问题。")
+        ])
 
 
 def generate_no_documents_response(state: SelfCorrectiveRAGState, query: str) -> Dict[str, Any]:

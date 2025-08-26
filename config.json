@@ -18,6 +18,13 @@
     "conversation_temperature": "${CONVERSATION_TEMPERATURE:0.1}",
     "parameter_analysis_temperature": "${PARAMETER_ANALYSIS_TEMPERATURE:0.3}"
   },
+  "node_models": {
+    "generation_model": "${GENERATION_MODEL:gpt-4}",
+    "validation_model": "${VALIDATION_MODEL:gpt-4}",
+    "correction_model": "${CORRECTION_MODEL:gpt-4}",
+    "rewrite_model": "${REWRITE_MODEL:gpt-3.5-turbo}",
+    "grading_model": "${GRADING_MODEL:gpt-3.5-turbo}"
+  },
   "chunking": {
     "chunk_size": "${CHUNK_SIZE:1000}",
     "chunk_overlap": "${CHUNK_OVERLAP:200}",

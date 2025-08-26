@@ -9,6 +9,7 @@ from langchain_core.documents import Document
 
 from ..state import SelfCorrectiveRAGState
 from ..utils import get_llm_client, evaluate_answer_quality, parse_validation_result
+from ...core.prompt_manager import prompt_manager
 
 
 def validate_answer_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
@@ -41,7 +42,7 @@ def validate_answer_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
             }
         
         # 获取验证模型
-        validator_llm = get_llm_client("gpt-4")
+        validator_llm = get_llm_client(node_type="validation")
         
         if not validator_llm:
             # 使用简单验证作为后备
@@ -122,7 +123,7 @@ def correct_answer_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
             }
         
         # 获取纠错模型
-        corrector_llm = get_llm_client("gpt-4")
+        corrector_llm = get_llm_client(node_type="correction")
         
         if not corrector_llm:
             return {
@@ -190,29 +191,42 @@ def perform_comprehensive_validation(
     Returns:
         验证结果字典
     """
-    validation_prompt = ChatPromptTemplate.from_messages([
-        ("system", 
-         "你是一个专业的答案质量评估专家。请从以下维度评估答案质量：\n"
-         "1. 准确性：答案是否基于提供的上下文，没有错误信息\n"
-         "2. 完整性：答案是否完整回答了用户问题\n"
-         "3. 相关性：答案是否与问题直接相关\n"
-         "4. 清晰度：答案是否表达清晰，易于理解\n"
-         "5. 结构性：答案是否组织良好，逻辑清晰\n\n"
-         "请为每个维度给出1-10的评分，并提供具体的改进建议。\n"
-         "输出格式：\n"
-         "准确性: [分数] - [评价]\n"
-         "完整性: [分数] - [评价]\n"
-         "相关性: [分数] - [评价]\n"
-         "清晰度: [分数] - [评价]\n"
-         "结构性: [分数] - [评价]\n"
-         "总体评价: [总结]\n"
-         "改进建议: [具体建议]"),
-        ("human", 
-         "上下文信息：\n{context}\n\n"
-         "用户问题：{query}\n\n"
-         "生成的答案：{answer}\n\n"
-         "请评估这个答案的质量。")
-    ])
+    try:
+        # 从配置中获取验证prompt
+        system_prompt = prompt_manager.get_prompt('validation', 'system_prompt')
+        user_template = prompt_manager.get_prompt('validation', 'user_template')
+        
+        validation_prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", user_template)
+        ])
+        
+    except Exception as e:
+        # 如果配置加载失败，使用默认prompt
+        print(f"Warning: Failed to load validation prompts from config: {e}")
+        validation_prompt = ChatPromptTemplate.from_messages([
+            ("system", 
+             "你是一个专业的答案质量评估专家。请从以下维度评估答案质量：\n"
+             "1. 准确性：答案是否基于提供的上下文，没有错误信息\n"
+             "2. 完整性：答案是否完整回答了用户问题\n"
+             "3. 相关性：答案是否与问题直接相关\n"
+             "4. 清晰度：答案是否表达清晰，易于理解\n"
+             "5. 结构性：答案是否组织良好，逻辑清晰\n\n"
+             "请为每个维度给出1-10的评分，并提供具体的改进建议。\n"
+             "输出格式：\n"
+             "准确性: [分数] - [评价]\n"
+             "完整性: [分数] - [评价]\n"
+             "相关性: [分数] - [评价]\n"
+             "清晰度: [分数] - [评价]\n"
+             "结构性: [分数] - [评价]\n"
+             "总体评价: [总结]\n"
+             "改进建议: [具体建议]"),
+            ("human", 
+             "上下文信息：\n{context}\n\n"
+             "用户问题：{query}\n\n"
+             "生成的答案：{answer}\n\n"
+             "请评估这个答案的质量。")
+        ])
     
     try:
         response = validator_llm.invoke(
@@ -441,24 +455,36 @@ def perform_answer_correction(
     Returns:
         纠正后的答案
     """
-    # 构建纠错提示
-    correction_prompt = ChatPromptTemplate.from_messages([
-        ("system", 
-         "你是一个专业的答案改进专家。请基于验证反馈改进原始答案。\n"
-         "改进原则：\n"
-         "1. 保持答案的核心内容和准确性\n"
-         "2. 根据反馈改进答案的不足之处\n"
-         "3. 确保答案完整回答用户问题\n"
-         "4. 改善答案的清晰度和结构\n"
-         "5. 只基于提供的上下文信息\n\n"
-         "请输出改进后的答案，不要包含解释或元信息。"),
-        ("human", 
-         "上下文信息：\n{context}\n\n"
-         "用户问题：{query}\n\n"
-         "原始答案：{original_answer}\n\n"
-         "验证反馈：{validation_feedback}\n\n"
-         "请基于上述信息改进答案。")
-    ])
+    try:
+        # 从配置中获取纠错prompt
+        system_prompt = prompt_manager.get_prompt('correction', 'system_prompt')
+        user_template = prompt_manager.get_prompt('correction', 'user_template')
+        
+        correction_prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", user_template)
+        ])
+        
+    except Exception as e:
+        # 如果配置加载失败，使用默认prompt
+        print(f"Warning: Failed to load correction prompts from config: {e}")
+        correction_prompt = ChatPromptTemplate.from_messages([
+            ("system", 
+             "你是一个专业的答案改进专家。请基于验证反馈改进原始答案。\n"
+             "改进原则：\n"
+             "1. 保持答案的核心内容和准确性\n"
+             "2. 根据反馈改进答案的不足之处\n"
+             "3. 确保答案完整回答用户问题\n"
+             "4. 改善答案的清晰度和结构\n"
+             "5. 只基于提供的上下文信息\n\n"
+             "请输出改进后的答案，不要包含解释或元信息。"),
+            ("human", 
+             "上下文信息：\n{context}\n\n"
+             "用户问题：{query}\n\n"
+             "原始答案：{original_answer}\n\n"
+             "验证反馈：{validation_feedback}\n\n"
+             "请基于上述信息改进答案。")
+        ])
     
     try:
         response = corrector_llm.invoke(

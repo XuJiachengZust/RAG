@@ -10,6 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from ..state import SelfCorrectiveRAGState, DocumentGrade
 from ..utils import create_rules_retriever, get_llm_client, parse_relevance_score
 from ..retrieval_manager import calculate_retrieval_quality
+from ...core.prompt_manager import prompt_manager
 
 
 def intelligent_retrieval_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
@@ -126,7 +127,7 @@ def grade_documents_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
             }
         
         # 获取评分模型
-        grader_llm = get_llm_client("gpt-3.5-turbo")
+        grader_llm = get_llm_client(node_type="grading")
         
         if not grader_llm:
             # 如果无法获取LLM，使用简单的文本匹配评分
@@ -311,21 +312,32 @@ def llm_document_grading(
     Returns:
         评分结果列表
     """
-    grader_prompt = ChatPromptTemplate.from_messages([
-        ("system", 
-         "你是一个文档相关性评估专家。你需要评估给定文档是否满足用户查询意图。\n"
-         "请给出0-1之间的相关性分数，并简要说明理由。\n"
-         "评分标准：\n"
-         "- 0.8-1.0: 高度相关，直接回答查询\n"
-         "- 0.6-0.8: 相关，包含有用信息\n"
-         "- 0.4-0.6: 部分相关，有一些相关内容\n"
-         "- 0.2-0.4: 弱相关，只有少量相关信息\n"
-         "- 0.0-0.2: 不相关，与查询无关"),
-        ("human", 
-         "查询: {query}\n\n"
-         "文档内容: {document}\n\n"
-         "请评估这个文档是否满足用户查询意图，给出分数（0-1）和理由。")
-    ])
+    try:
+        # 从prompt_manager获取评分prompt
+        system_prompt = prompt_manager.get_prompt('grading', 'system_prompt')
+        user_template = prompt_manager.get_prompt('grading', 'user_prompt_template')
+        
+        grader_prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", user_template)
+        ])
+    except Exception as e:
+        # 如果配置加载失败，使用默认prompt
+        grader_prompt = ChatPromptTemplate.from_messages([
+            ("system", 
+             "你是一个文档相关性评估专家。你需要评估给定文档是否满足用户查询意图。\n"
+             "请给出0-1之间的相关性分数，并简要说明理由。\n"
+             "评分标准：\n"
+             "- 0.8-1.0: 高度相关，直接回答查询\n"
+             "- 0.6-0.8: 相关，包含有用信息\n"
+             "- 0.4-0.6: 部分相关，有一些相关内容\n"
+             "- 0.2-0.4: 弱相关，只有少量相关信息\n"
+             "- 0.0-0.2: 不相关，与查询无关"),
+            ("human", 
+             "查询: {query}\n\n"
+             "文档内容: {document}\n\n"
+             "请评估这个文档是否满足用户查询意图，给出分数（0-1）和理由。")
+        ])
     
     graded_documents = []
     

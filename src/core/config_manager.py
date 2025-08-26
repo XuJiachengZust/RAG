@@ -135,9 +135,10 @@ class ConfigManager:
                 "max_table_size": 5000
             },
             "retrieval": {
-                "top_k": 5,
-                "similarity_threshold": 0.7,
-                "max_retrieval_attempts": 3
+                "top_k": "${RETRIEVAL_K:5}",
+                "similarity_threshold": "${SCORE_THRESHOLD:0.7}",
+                "search_type": "${SEARCH_TYPE:similarity}",
+                "max_retrieval_attempts": "${MAX_RETRIEVAL_ATTEMPTS:3}"
             },
             "generation": {
                 "max_generation_attempts": 2,
@@ -155,6 +156,13 @@ class ConfigManager:
                 "max_retry_attempts": 3,
                 "relevance_threshold": 0.7,
                 "enable_query_rewriting": True
+            },
+            "node_models": {
+                "generation_model": os.getenv("GENERATION_MODEL", "gpt-4o-mini"),
+                "validation_model": os.getenv("VALIDATION_MODEL", "gpt-4o-mini"),
+                "correction_model": os.getenv("CORRECTION_MODEL", "gpt-4o-mini"),
+                "rewrite_model": os.getenv("REWRITE_MODEL", "gpt-3.5-turbo"),
+                "grading_model": os.getenv("GRADING_MODEL", "gpt-3.5-turbo")
             }
         }
     

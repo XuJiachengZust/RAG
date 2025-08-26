@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from ..state import SelfCorrectiveRAGState
 from ..utils import get_llm_client, extract_keywords, clean_text
+from ...core.prompt_manager import prompt_manager
 
 
 def rewrite_query_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
@@ -43,7 +44,7 @@ def rewrite_query_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
         failure_analysis = analyze_retrieval_failure(state)
         
         # 获取查询重写模型
-        rewriter_llm = get_llm_client("gpt-3.5-turbo")
+        rewriter_llm = get_llm_client(node_type="rewrite")
         
         if not rewriter_llm:
             # 使用简单重写策略作为后备
@@ -240,90 +241,109 @@ def create_rewrite_prompt(strategy: str, query_intent: str) -> ChatPromptTemplat
     Returns:
         提示模板
     """
-    base_system_prompt = (
-        "你是一个专业的查询优化专家，擅长改写用户查询以提高信息检索效果。\n"
-        "请根据指定的策略重写用户查询，确保重写后的查询能够更好地匹配相关文档。\n\n"
-        "重写原则：\n"
-        "1. 保持原始查询的核心意图\n"
-        "2. 使用更准确和具体的词汇\n"
-        "3. 避免过于复杂或模糊的表达\n"
-        "4. 考虑同义词和相关术语\n"
-        "5. 确保查询在目标领域内有意义"
-    )
-    
-    # 策略特定的指导
-    strategy_prompts = {
-        "expand_keywords": (
-            "\n\n当前策略：扩展关键词\n"
-            "- 添加相关的同义词和近义词\n"
-            "- 包含更多描述性词汇\n"
-            "- 考虑不同的表达方式\n"
-            "- 保持查询的核心主题"
-        ),
-        "rephrase_query": (
-            "\n\n当前策略：重新表述\n"
-            "- 使用不同的句式结构\n"
-            "- 替换关键词为更常用的表达\n"
-            "- 简化复杂的表述\n"
-            "- 使查询更加自然和直接"
-        ),
-        "generalize_query": (
-            "\n\n当前策略：泛化查询\n"
-            "- 移除过于具体的限定词\n"
-            "- 使用更通用的概念\n"
-            "- 扩大查询的覆盖范围\n"
-            "- 关注核心主题而非细节"
-        ),
-        "add_specificity": (
-            "\n\n当前策略：增加具体性\n"
-            "- 添加更具体的描述词\n"
-            "- 明确查询的具体方面\n"
-            "- 包含相关的技术术语\n"
-            "- 缩小查询范围以提高精确度"
-        ),
-        "decompose_query": (
-            "\n\n当前策略：分解查询\n"
-            "- 将复杂查询分解为核心部分\n"
-            "- 专注于最重要的信息需求\n"
-            "- 简化查询结构\n"
-            "- 突出主要关键词"
-        ),
-        "normalize_language": (
-            "\n\n当前策略：语言规范化\n"
-            "- 统一语言使用（中文或英文）\n"
-            "- 规范术语表达\n"
-            "- 修正语法和拼写\n"
-            "- 使用标准的表达方式"
+    try:
+        # 从配置中获取重写prompt
+        base_system_prompt = prompt_manager.get_prompt('rewrite', 'base_system_prompt')
+        strategy_prompt = prompt_manager.get_prompt('rewrite', f'strategy_prompts.{strategy}')
+        intent_prompt = prompt_manager.get_prompt('rewrite', f'intent_prompts.{query_intent}')
+        output_instruction = prompt_manager.get_prompt('rewrite', 'output_instruction')
+        user_template = prompt_manager.get_prompt('rewrite', 'user_template')
+        
+        # 组合系统提示
+        system_prompt = base_system_prompt + strategy_prompt + intent_prompt + output_instruction
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", user_template)
+        ])
+        
+    except Exception as e:
+        # 如果配置加载失败，使用默认prompt
+        print(f"Warning: Failed to load rewrite prompts from config: {e}")
+        base_system_prompt = (
+            "你是一个专业的查询优化专家，擅长改写用户查询以提高信息检索效果。\n"
+            "请根据指定的策略重写用户查询，确保重写后的查询能够更好地匹配相关文档。\n\n"
+            "重写原则：\n"
+            "1. 保持原始查询的核心意图\n"
+            "2. 使用更准确和具体的词汇\n"
+            "3. 避免过于复杂或模糊的表达\n"
+            "4. 考虑同义词和相关术语\n"
+            "5. 确保查询在目标领域内有意义"
         )
-    }
-    
-    # 意图特定的指导
-    intent_prompts = {
-        "definition": "\n\n查询意图：定义类问题\n重写时确保查询明确要求定义或解释。",
-        "how_to": "\n\n查询意图：操作指导\n重写时确保查询明确要求步骤或方法。",
-        "comparison": "\n\n查询意图：比较分析\n重写时确保查询明确要求比较不同选项。",
-        "best_practice": "\n\n查询意图：最佳实践\n重写时确保查询明确要求推荐做法。",
-        "troubleshooting": "\n\n查询意图：问题解决\n重写时确保查询明确描述问题和解决需求。",
-        "list": "\n\n查询意图：列表枚举\n重写时确保查询明确要求列举或枚举。",
-        "explanation": "\n\n查询意图：深入解释\n重写时确保查询明确要求详细解释。"
-    }
-    
-    # 组合系统提示
-    system_prompt = base_system_prompt
-    system_prompt += strategy_prompts.get(strategy, "")
-    system_prompt += intent_prompts.get(query_intent, "")
-    system_prompt += "\n\n请只输出重写后的查询，不要包含解释或其他内容。"
-    
-    return ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", 
-         "原始查询：{original_query}\n"
-         "重写策略：{strategy}\n"
-         "查询意图：{intent}\n"
-         "复杂度：{complexity}\n"
-         "检索失败原因：{failure_reasons}\n\n"
-         "请重写这个查询。")
-    ])
+        
+        # 策略特定的指导
+        strategy_prompts = {
+            "expand_keywords": (
+                "\n\n当前策略：扩展关键词\n"
+                "- 添加相关的同义词和近义词\n"
+                "- 包含更多描述性词汇\n"
+                "- 考虑不同的表达方式\n"
+                "- 保持查询的核心主题"
+            ),
+            "rephrase_query": (
+                "\n\n当前策略：重新表述\n"
+                "- 使用不同的句式结构\n"
+                "- 替换关键词为更常用的表达\n"
+                "- 简化复杂的表述\n"
+                "- 使查询更加自然和直接"
+            ),
+            "generalize_query": (
+                "\n\n当前策略：泛化查询\n"
+                "- 移除过于具体的限定词\n"
+                "- 使用更通用的概念\n"
+                "- 扩大查询的覆盖范围\n"
+                "- 关注核心主题而非细节"
+            ),
+            "add_specificity": (
+                "\n\n当前策略：增加具体性\n"
+                "- 添加更具体的描述词\n"
+                "- 明确查询的具体方面\n"
+                "- 包含相关的技术术语\n"
+                "- 缩小查询范围以提高精确度"
+            ),
+            "decompose_query": (
+                "\n\n当前策略：分解查询\n"
+                "- 将复杂查询分解为核心部分\n"
+                "- 专注于最重要的信息需求\n"
+                "- 简化查询结构\n"
+                "- 突出主要关键词"
+            ),
+            "normalize_language": (
+                "\n\n当前策略：语言规范化\n"
+                "- 统一语言使用（中文或英文）\n"
+                "- 规范术语表达\n"
+                "- 修正语法和拼写\n"
+                "- 使用标准的表达方式"
+            )
+        }
+        
+        # 意图特定的指导
+        intent_prompts = {
+            "definition": "\n\n查询意图：定义类问题\n重写时确保查询明确要求定义或解释。",
+            "how_to": "\n\n查询意图：操作指导\n重写时确保查询明确要求步骤或方法。",
+            "comparison": "\n\n查询意图：比较分析\n重写时确保查询明确要求比较不同选项。",
+            "best_practice": "\n\n查询意图：最佳实践\n重写时确保查询明确要求推荐做法。",
+            "troubleshooting": "\n\n查询意图：问题解决\n重写时确保查询明确描述问题和解决需求。",
+            "list": "\n\n查询意图：列表枚举\n重写时确保查询明确要求列举或枚举。",
+            "explanation": "\n\n查询意图：深入解释\n重写时确保查询明确要求详细解释。"
+        }
+        
+        # 组合系统提示
+        system_prompt = base_system_prompt
+        system_prompt += strategy_prompts.get(strategy, "")
+        system_prompt += intent_prompts.get(query_intent, "")
+        system_prompt += "\n\n请只输出重写后的查询，不要包含解释或其他内容。"
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", 
+             "原始查询：{original_query}\n"
+             "重写策略：{strategy}\n"
+             "查询意图：{intent}\n"
+             "复杂度：{complexity}\n"
+             "检索失败原因：{failure_reasons}\n\n"
+             "请重写这个查询。")
+        ])
 
 
 def simple_query_rewrite(state: SelfCorrectiveRAGState, failure_analysis: Dict[str, Any]) -> Dict[str, Any]:

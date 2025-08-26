@@ -502,11 +502,12 @@ def format_documents_for_context(documents: List[Document], max_length: int = 20
     return "\n".join(context_parts)
 
 
-def get_llm_client(model_name: str = "gpt-3.5-turbo"):
+def get_llm_client(model_name: str = None, node_type: str = None):
     """获取LLM客户端
     
     Args:
-        model_name: 模型名称
+        model_name: 模型名称（可选，如果提供则直接使用）
+        node_type: 节点类型（generation, validation, correction, rewrite, grading）
         
     Returns:
         配置好的LLM客户端
@@ -515,6 +516,15 @@ def get_llm_client(model_name: str = "gpt-3.5-turbo"):
         from langchain_openai import ChatOpenAI
         
         config = ConfigManager().get_config()
+        
+        # 如果没有指定模型名称，根据节点类型从配置中获取
+        if model_name is None:
+            if node_type:
+                node_models = config.get("node_models", {})
+                model_name = node_models.get(f"{node_type}_model", "gpt-3.5-turbo")
+            else:
+                # 默认使用配置中的通用模型
+                model_name = config.get("model", {}).get("model_name", "gpt-3.5-turbo")
         
         return ChatOpenAI(
             openai_api_key=config.get("api", {}).get("openai_api_key"),
