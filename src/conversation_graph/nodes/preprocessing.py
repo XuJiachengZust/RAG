@@ -3,9 +3,12 @@
 负责清理和标准化用户查询，提取关键信息。
 """
 
+import logging
 from typing import Dict, Any
 from ..state import SelfCorrectiveRAGState
 from ..utils import clean_text, extract_keywords
+
+logger = logging.getLogger(__name__)
 
 
 def preprocess_query_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
@@ -175,22 +178,39 @@ def adjust_processing_parameters(state: SelfCorrectiveRAGState, complexity_level
         "quality_threshold": state.get("quality_threshold", 0.7)
     }
     
-    # 根据复杂度调整参数
+    # 从 state 中获取配置的 retrieval_k 基础值
+    base_retrieval_k = state.get("retrieval_k", 5)
+    logger.info(f"预处理节点 - 基础 retrieval_k: {base_retrieval_k}, 查询复杂度: {complexity_level}")
+    
+    if complexity_level == "complex":
+        # 复杂查询：增加检索文档数量和重试次数
+        adjusted_retrieval_k = min(base_retrieval_k + 2, 15)  # 增加2个文档，最大15
+        logger.info(f"复杂查询 - 调整后 retrieval_k: {adjusted_retrieval_k}")
+    elif complexity_level == "medium":
+        # 中等查询：保持基础值
+        adjusted_retrieval_k = base_retrieval_k
+        logger.info(f"中等查询 - 保持 retrieval_k: {adjusted_retrieval_k}")
+    else:  # simple
+        # 简单查询：减少检索文档数量
+        adjusted_retrieval_k = max(base_retrieval_k - 2, 1)  # 减少2个文档，最小1
+        logger.info(f"简单查询 - 调整后 retrieval_k: {adjusted_retrieval_k}")
+    
+    # 根据复杂度调整参数并返回
     if complexity_level == "complex":
         # 复杂查询：增加尝试次数，降低质量阈值
         return {
             "max_retrieval_attempts": min(base_params["max_retrieval_attempts"] + 1, 5),
             "max_generation_attempts": min(base_params["max_generation_attempts"] + 1, 3),
             "quality_threshold": max(base_params["quality_threshold"] - 0.1, 0.5),
-            "retrieval_k": 7  # 检索更多文档
+            "retrieval_k": adjusted_retrieval_k
         }
     elif complexity_level == "medium":
-        # 中等复杂度：保持默认参数
+        # 中等复杂度：保持基础配置值
         return {
             "max_retrieval_attempts": base_params["max_retrieval_attempts"],
             "max_generation_attempts": base_params["max_generation_attempts"],
             "quality_threshold": base_params["quality_threshold"],
-            "retrieval_k": 5
+            "retrieval_k": adjusted_retrieval_k
         }
     else:
         # 简单查询：可以使用更严格的质量要求
@@ -198,7 +218,7 @@ def adjust_processing_parameters(state: SelfCorrectiveRAGState, complexity_level
             "max_retrieval_attempts": max(base_params["max_retrieval_attempts"] - 1, 2),
             "max_generation_attempts": base_params["max_generation_attempts"],
             "quality_threshold": min(base_params["quality_threshold"] + 0.1, 0.9),
-            "retrieval_k": 3  # 检索较少文档
+            "retrieval_k": adjusted_retrieval_k
         }
 
 

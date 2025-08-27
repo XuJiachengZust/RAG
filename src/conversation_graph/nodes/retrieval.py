@@ -3,6 +3,8 @@
 负责智能文档检索和相关性评分。
 """
 
+import logging
+from datetime import datetime
 from typing import Dict, Any, List
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
@@ -53,6 +55,19 @@ def intelligent_retrieval_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
                 "retrieval_attempts": state.get("retrieval_attempts", 0) + 1
             }
         
+        # 记录检索尝试次数
+        retrieval_attempts = state.get("retrieval_attempts", 0) + 1
+        
+        # 在向量查询开始前输出详细日志
+        logging.info("=== 开始向量查询 ===")
+        logging.info(f"查询文本: {query}")
+        logging.info(f"关键词列表: {keywords}")
+        logging.info(f"复杂度级别: {complexity_level}")
+        logging.info(f"retrieval_k 参数: {retrieval_k}")
+        logging.info(f"检索尝试次数: {retrieval_attempts}")
+        logging.info(f"当前时间戳: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
+        logging.info("===================")
+        
         # 执行基础检索
         documents = retriever.invoke(query)
         
@@ -75,9 +90,6 @@ def intelligent_retrieval_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
         
         # 计算检索质量分数
         retrieval_score = calculate_retrieval_quality(query, filtered_documents)
-        
-        # 记录检索尝试
-        retrieval_attempts = state.get("retrieval_attempts", 0) + 1
         
         return {
             "retrieved_documents": filtered_documents,

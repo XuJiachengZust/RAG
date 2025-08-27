@@ -3,9 +3,12 @@
 负责在LangGraph中进行条件路由决策。
 """
 
+import logging
 from typing import Dict, Any, Literal
 
 from ..state import SelfCorrectiveRAGState
+
+logger = logging.getLogger(__name__)
 
 
 def should_retrieve_documents(state: SelfCorrectiveRAGState) -> Literal["retrieve", "generate_direct"]:
@@ -64,8 +67,13 @@ def should_rewrite_query(state: SelfCorrectiveRAGState) -> Literal["rewrite", "g
     graded_documents = state.get("graded_documents", [])
     retrieval_attempts = state.get("retrieval_attempts", 0)
     max_retrieval_attempts = state.get("max_retrieval_attempts", 3)
-    retrieval_quality = state.get("retrieval_quality", 0.0)
+    retrieval_score = state.get("retrieval_score", 0.0)
     quality_threshold = state.get("quality_threshold", 0.7)
+    
+    # 打印调试信息
+    logger.info(f"should_rewrite_query - 状态参数: graded_documents={len(graded_documents)}, "
+                f"retrieval_attempts={retrieval_attempts}, max_retrieval_attempts={max_retrieval_attempts}, "
+                f"retrieval_score={retrieval_score}, quality_threshold={quality_threshold}")
     
     # 检查是否已达到最大尝试次数
     if retrieval_attempts >= max_retrieval_attempts:
@@ -79,7 +87,7 @@ def should_rewrite_query(state: SelfCorrectiveRAGState) -> Literal["rewrite", "g
         return "rewrite"
     
     # 如果检索质量低于阈值，需要重写查询
-    if retrieval_quality < quality_threshold:
+    if retrieval_score < quality_threshold:
         return "rewrite"
     
     # 如果相关文档数量太少，可能需要重写

@@ -35,7 +35,7 @@ class SelfCorrectiveRAG:
             config: 配置参数
         """
         self.config_manager = ConfigManager()
-        self.config = config or self._get_default_config()
+        self.config = config or self.config_manager.get_config()
         
         # 初始化文档系统
         self.document_initializer = DocumentInitializer({
@@ -182,6 +182,8 @@ class SelfCorrectiveRAG:
             包含答案和元数据的字典
         """
         try:
+            logger.info(f"从配置获取 retrieval_k: {self.config.get('retrieval.k', 5)}")
+            
             # 初始化状态
             initial_state = SelfCorrectiveRAGState(
                 messages=[],
@@ -203,6 +205,7 @@ class SelfCorrectiveRAG:
                 max_retrieval_attempts=self.config.get('max_retries', 3),
                 max_generation_attempts=self.config.get('max_retries', 3),
                 quality_threshold=self.config.get('relevance_threshold', 0.7),
+                retrieval_k=self.config.get('retrieval.k', 5),
                 final_answer="",
                 confidence_score=0.0,
                 processing_time=0.0,

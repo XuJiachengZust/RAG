@@ -36,6 +36,7 @@ class ConfigManager:
         default_config = self._get_default_config()
         
         if not self.config_path.exists():
+            print("未找到配置文件，正在创建默认配置文件...")
             # 如果配置文件不存在，创建默认配置文件
             self._save_config(default_config)
             return default_config
@@ -135,7 +136,7 @@ class ConfigManager:
                 "max_table_size": 5000
             },
             "retrieval": {
-                "top_k": "${RETRIEVAL_K:5}",
+                "k": "${RETRIEVAL_K:5}",
                 "similarity_threshold": "${SCORE_THRESHOLD:0.7}",
                 "search_type": "${SEARCH_TYPE:similarity}",
                 "max_retrieval_attempts": "${MAX_RETRIEVAL_ATTEMPTS:3}"
@@ -197,46 +198,59 @@ class ConfigManager:
     def _parse_env_variable(self, value: str) -> Any:
         """解析单个环境变量占位符
         
+        支持格式:
+        - ${VAR_NAME} - 必需的环境变量
+        - ${VAR_NAME:default_value} - 可选的环境变量，带默认值
+        
         Args:
-            value: 可能包含环境变量占位符的字符串
+            value: 包含环境变量占位符的字符串
             
         Returns:
             解析后的值
         """
-        # 匹配环境变量格式 ${VAR_NAME:default_value} 或 ${VAR_NAME}
-        pattern = r'\$\{([^:}]+)(?::([^}]+))?\}'
+        # 匹配 ${VAR_NAME} 或 ${VAR_NAME:default_value} 格式
+        pattern = r'\$\{([^}:]+)(?::([^}]*))?\}'
+        match = re.search(pattern, value)
         
-        def replace_env_var(match):
-            env_var = match.group(1)
-            default_val = match.group(2) if match.group(2) is not None else None
+        if not match:
+            return value
             
-            env_value = os.getenv(env_var)
-            if env_value is not None:
-                return env_value
-            elif default_val is not None:
-                return default_val
-            else:
-                # 如果没有默认值且环境变量不存在，保持原样
-                return match.group(0)
+        var_name = match.group(1)
+        default_value = match.group(2) if match.group(2) is not None else None
+        placeholder = match.group(0)  # 完整的占位符，如 ${VAR_NAME:default}
         
-        # 如果整个字符串就是一个环境变量占位符，尝试转换类型
-        if re.match(r'^\$\{[^}]+\}$', value):
-            resolved = re.sub(pattern, replace_env_var, value)
-            # 尝试转换为数字类型
-            if resolved != value:  # 如果有替换发生
-                try:
-                    # 尝试转换为整数
-                    if resolved.isdigit() or (resolved.startswith('-') and resolved[1:].isdigit()):
-                        return int(resolved)
-                    # 尝试转换为浮点数
-                    return float(resolved)
-                except ValueError:
-                    # 如果转换失败，返回字符串
-                    return resolved
-            return resolved
+        # 获取环境变量值
+        env_value = os.getenv(var_name)
+        
+        if env_value is not None:
+            # 使用字符串替换避免正则表达式转义问题
+            result = value.replace(placeholder, env_value)
+        elif default_value is not None:
+            # 使用字符串替换避免正则表达式转义问题
+            result = value.replace(placeholder, default_value)
         else:
-            # 部分替换，返回字符串
-            return re.sub(pattern, replace_env_var, value)
+            print(f"环境变量 {var_name} 未设置且无默认值")
+            return None
+            
+        # 尝试转换为适当的类型
+        try:
+            # 尝试转换为整数
+            if result.isdigit() or (result.startswith('-') and result[1:].isdigit()):
+                return int(result)
+        except ValueError:
+            pass
+            
+        try:
+            # 尝试转换为浮点数
+            return float(result)
+        except ValueError:
+            pass
+            
+        # 尝试转换为布尔值
+        if result.lower() in ('true', 'false'):
+            return result.lower() == 'true'
+            
+        return result
 
     def _save_config(self, config: Dict[str, Any]) -> None:
         """保存配置到文件"""

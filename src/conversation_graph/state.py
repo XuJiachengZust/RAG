@@ -9,6 +9,12 @@ from typing_extensions import TypedDict
 from langchain_core.messages import BaseMessage
 from langchain_core.documents import Document
 from datetime import datetime
+import logging
+
+# 导入配置管理器
+from src.core.config_manager import ConfigManager
+
+logger = logging.getLogger(__name__)
 
 
 class SelfCorrectiveRAGState(TypedDict):
@@ -46,6 +52,7 @@ class SelfCorrectiveRAGState(TypedDict):
     max_retrieval_attempts: int  # 最大检索尝试次数
     max_generation_attempts: int  # 最大生成尝试次数
     quality_threshold: float  # 质量阈值 (0-1)
+    retrieval_k: int  # 检索文档数量
     
     # === 结果状态 ===
     final_answer: str  # 最终答案
@@ -90,7 +97,8 @@ def initialize_state(
     session_id: Optional[str] = None,
     max_retrieval_attempts: int = 3,
     max_generation_attempts: int = 2,
-    quality_threshold: float = 0.7
+    quality_threshold: float = 0.7,
+    retrieval_k: Optional[int] = None
 ) -> SelfCorrectiveRAGState:
     """创建初始状态
     
@@ -100,10 +108,20 @@ def initialize_state(
         max_retrieval_attempts: 最大检索尝试次数
         max_generation_attempts: 最大生成尝试次数
         quality_threshold: 质量阈值
+        retrieval_k: 检索文档数量，如果为None则从配置中获取
         
     Returns:
         初始化的状态对象
     """
+    # 从配置管理器获取配置
+    config_manager = ConfigManager()
+    config = config_manager.get_config()
+    
+    # 如果 retrieval_k 为 None，则从配置中获取
+    if retrieval_k is None:
+        retrieval_k = config.get('retrieval', {}).get('k', 5)
+    
+    logger.info(f"initialize_state 中使用的 retrieval_k: {retrieval_k}")
     return SelfCorrectiveRAGState(
         # 基础状态
         messages=[],
@@ -133,6 +151,7 @@ def initialize_state(
         max_retrieval_attempts=max_retrieval_attempts,
         max_generation_attempts=max_generation_attempts,
         quality_threshold=quality_threshold,
+        retrieval_k=retrieval_k,
         
         # 结果状态
         final_answer="",
