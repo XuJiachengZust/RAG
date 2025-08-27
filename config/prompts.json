@@ -1,0 +1,94 @@
+{
+  "version": "1.0",
+  "description": "智能对话系统所有节点的prompt模板配置",
+  "last_updated": "2024-01-20",
+  "prompts": {
+    "generation": {
+      "description": "答案生成节点的prompt模板",
+      "base_system_prompt": "你是一个专业的知识助手，能够基于提供的上下文信息准确回答用户问题。请确保答案准确、完整、有条理。",
+      "user_prompt_template": "上下文信息：\n{context}\n\n用户问题：{query}\n\n请基于上述上下文信息回答用户问题。",
+      "user_template": "上下文信息：\n{context}\n\n用户问题：{query}\n\n请基于上述上下文信息回答用户问题。",
+      "intent_prompts": {
+        "definition": "请提供清晰准确的定义，包括核心概念和关键特征。",
+        "how_to": "请提供详细的步骤说明，确保操作的可行性和准确性。",
+        "comparison": "请从多个维度进行比较分析，突出各自的优缺点。",
+        "best_practice": "请提供经过验证的最佳实践建议。",
+        "troubleshooting": "请提供系统性的问题诊断和解决方案。",
+        "list": "请提供结构化的列表，确保内容完整和逻辑清晰。",
+        "explanation": "请提供深入的解释说明，包括原理和背景信息。",
+        "general": "请提供准确、完整的回答，确保内容相关且有用。"
+      },
+      "complexity_adjustments": {
+        "simple": "请用简洁明了的语言回答，避免过于复杂的术语。",
+        "medium": "请提供适度详细的解释，平衡深度和可理解性。",
+        "complex": "请提供全面深入的分析，包括技术细节和相关背景。"
+      },
+      "complexity_prompts": {
+      "simple": "请用简洁明了的语言回答，避免过于复杂的术语。",
+      "medium": "请提供适度详细的解释，平衡深度和可理解性。",
+      "complex": "请提供全面深入的分析，包括技术细节和相关背景。"
+    }
+  },
+  "validation": {
+    "description": "答案验证节点的prompt模板",
+    "system_prompt": "你是一个专业的答案质量评估专家。请从以下维度评估答案质量：\n1. 准确性：答案是否基于提供的上下文，没有错误信息\n2. 完整性：答案是否完整回答了用户问题\n3. 相关性：答案是否与问题直接相关\n4. 清晰度：答案是否表达清晰，易于理解\n5. 结构性：答案是否组织良好，逻辑清晰\n\n请为每个维度给出1-10的评分，并提供具体的改进建议。\n输出格式：\n准确性: [分数] - [评价]\n完整性: [分数] - [评价]\n相关性: [分数] - [评价]\n清晰度: [分数] - [评价]\n结构性: [分数] - [评价]\n总体评价: [总结]\n改进建议: [具体建议]",
+    "user_prompt_template": "上下文信息：\n{context}\n\n用户问题：{query}\n\n生成的答案：{answer}\n\n请评估这个答案的质量。",
+    "user_template": "上下文信息：\n{context}\n\n用户问题：{query}\n\n生成的答案：{answer}\n\n请评估这个答案的质量。",
+    "evaluation_dimensions": {
+      "accuracy": "准确性：答案是否基于提供的上下文，没有错误信息",
+      "completeness": "完整性：答案是否完整回答了用户问题",
+      "relevance": "相关性：答案是否与问题直接相关",
+      "clarity": "清晰度：答案是否表达清晰，易于理解",
+      "structure": "结构性：答案是否组织良好，逻辑清晰"
+    }
+  },
+  "correction": {
+    "description": "答案纠错节点的prompt模板",
+    "system_prompt": "你是一个专业的答案改进专家。请基于验证反馈改进原始答案。\n改进原则：\n1. 保持答案的核心内容和准确性\n2. 根据反馈改进答案的不足之处\n3. 确保答案完整回答用户问题\n4. 改善答案的清晰度和结构\n5. 只基于提供的上下文信息\n\n请输出改进后的答案，不要包含解释或元信息。",
+    "user_prompt_template": "上下文信息：\n{context}\n\n用户问题：{query}\n\n原始答案：{original_answer}\n\n验证反馈：{validation_feedback}\n\n请基于上述信息改进答案。",
+    "improvement_principles": {
+      "preserve_core": "保持答案的核心内容和准确性",
+      "address_feedback": "根据反馈改进答案的不足之处",
+      "ensure_completeness": "确保答案完整回答用户问题",
+      "improve_clarity": "改善答案的清晰度和结构",
+      "context_based": "只基于提供的上下文信息"
+    }
+  },
+  "rewrite": {
+    "description": "查询重写节点的prompt模板",
+      "base_system_prompt": "你是一个专业的查询优化专家，专门负责重写和优化用户查询以提高信息检索效果。请根据重写策略和查询意图优化查询，只输出重写后的查询。",
+      "strategy_prompts": {
+        "expand_keywords": "扩展关键词：添加相关的同义词、近义词和相关术语，丰富查询表达",
+        "rephrase": "重新表述：用不同的表达方式重新组织查询，保持原意但改变表述",
+        "generalize": "泛化查询：使用更通用的术语，扩大搜索范围",
+        "specify": "具体化：添加更具体的限定词和细节，缩小搜索范围",
+        "decompose": "分解查询：将复杂查询分解为多个简单的子查询",
+        "add_context": "添加上下文：为查询添加相关的背景信息和上下文"
+      },
+      "intent_prompts": {
+        "definition": "针对定义类查询，重写时应包含'是什么'、'定义'、'概念'等关键词",
+        "how_to": "针对操作指导类查询，重写时应包含'如何'、'怎样'、'步骤'、'方法'等关键词",
+        "comparison": "针对比较类查询，重写时应包含'比较'、'区别'、'异同'、'对比'等关键词",
+        "best_practice": "针对最佳实践类查询，重写时应包含'最佳'、'推荐'、'实践'、'经验'等关键词",
+        "troubleshooting": "针对故障排除类查询，重写时应包含'问题'、'错误'、'解决'、'故障'等关键词",
+        "list": "针对列表类查询，重写时应包含'列表'、'清单'、'有哪些'、'包括'等关键词",
+        "explanation": "针对解释类查询，重写时应包含'解释'、'说明'、'原理'、'为什么'等关键词",
+        "general": "针对一般查询，重写时应保持查询的核心意图，适当扩展相关术语"
+      },
+      "user_prompt_template": "原始查询：{original_query}\n\n查询意图：{intent}\n\n重写策略：{strategy}\n\n失败分析：{failure_analysis}\n\n查询复杂度：{complexity}\n\n请根据上述信息重写查询，只输出重写后的查询文本。",
+      "user_template": "原始查询：{original_query}\n\n查询意图：{intent}\n\n重写策略：{strategy}\n\n失败分析：{failure_analysis}\n\n查询复杂度：{complexity}\n\n请根据上述信息重写查询，只输出重写后的查询文本。",
+      "output_instruction": "请只输出重写后的查询文本，不要包含任何解释或元信息。"
+  },
+  "grading": {
+    "description": "文档评分节点的prompt模板",
+      "system_prompt": "你是一个专业的文档相关性评估专家。请评估给定文档是否能够满足用户查询的信息需求。\n\n评估标准：\n1. 文档内容是否与查询主题直接相关\n2. 文档是否包含回答查询所需的关键信息\n3. 文档信息的完整性和准确性\n4. 文档内容的质量和可信度\n\n请给出0-1之间的相关性分数：\n- 0.9-1.0：极高相关性，完全满足查询需求\n- 0.7-0.9：高相关性，大部分满足查询需求\n- 0.5-0.7：中等相关性，部分满足查询需求\n- 0.3-0.5：低相关性，少量满足查询需求\n- 0.0-0.3：不相关或几乎不相关\n\n输出格式：\n分数：[0-1之间的数值]\n理由：[简要说明评分理由]",
+      "user_prompt_template": "用户查询：{query}\n\n文档内容：\n{document}\n\n请评估此文档对于回答用户查询的相关性。"
+    }
+  },
+  "metadata": {
+    "created_at": "2024-01-15",
+    "last_updated": "2024-01-15",
+    "author": "RAG System",
+    "notes": "所有prompt模板支持动态参数替换，使用 {parameter_name} 格式"
+  }
+}
