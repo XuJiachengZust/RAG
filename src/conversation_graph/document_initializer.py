@@ -100,7 +100,7 @@ class DocumentInitializer:
             self._initialize_components()
             
             # 2. 清空向量库（如果配置启用）
-            if self.config.get('clear_vector_store_on_startup', True):
+            if self.config_manager.get('vector_store.clear_on_startup', True):
                 self._clear_vector_store()
             
             # 3. 检查是否需要重新加载
