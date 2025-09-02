@@ -56,7 +56,7 @@ def validate_answer_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
         
         context = "\n\n".join([
             f"文档 {i+1}: {doc.page_content[:500]}..."
-            for i, doc in enumerate(relevant_docs[:3])
+            for i, doc in enumerate(relevant_docs[:5])
         ])
         
         # 执行多维度验证
