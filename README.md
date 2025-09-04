@@ -37,10 +37,17 @@ flowchart TB
     
     subgraph "处理节点层"
         PREPROCESS[预处理节点]
-        RETRIEVE[检索节点]
+        RETRIEVE[混合检索节点]
         REWRITE[重写节点]
         GENERATE[生成节点]
         VALIDATE[验证节点]
+    end
+    
+    subgraph "混合检索层"
+        VECTOR_SEARCH[向量检索]
+        KEYWORD_SEARCH[关键词检索]
+        HYBRID_MERGE[混合合并]
+        FULLTEXT[全文检索引擎]
     end
     
     subgraph "文档处理层"
@@ -52,6 +59,7 @@ flowchart TB
     subgraph "存储层"
         CHROMA[(ChromaDB)]
         VECTOR[向量存储]
+        FTS[FTS5全文索引]
     end
     
     subgraph "外部服务"
@@ -63,7 +71,11 @@ flowchart TB
     LG --> STATE
     STATE --> PREPROCESS
     PREPROCESS --> RETRIEVE
-    RETRIEVE --> REWRITE
+    RETRIEVE --> VECTOR_SEARCH
+    RETRIEVE --> KEYWORD_SEARCH
+    VECTOR_SEARCH --> HYBRID_MERGE
+    KEYWORD_SEARCH --> HYBRID_MERGE
+    HYBRID_MERGE --> REWRITE
     REWRITE --> GENERATE
     GENERATE --> VALIDATE
     
@@ -72,7 +84,10 @@ flowchart TB
     METADATA --> VECTOR
     VECTOR --> CHROMA
     
-    RETRIEVE --> CHROMA
+    VECTOR_SEARCH --> CHROMA
+    KEYWORD_SEARCH --> FULLTEXT
+    FULLTEXT --> FTS
+    FTS --> CHROMA
     GENERATE --> OPENAI
     VECTOR --> EMBEDDING
 ```
@@ -83,15 +98,19 @@ flowchart TB
 stateDiagram-v2
     [*] --> 预处理
     
-    预处理 --> 检索
-    检索 --> 结果评估
+    预处理 --> 混合检索
+    混合检索 --> 向量检索
+    混合检索 --> 关键词检索
+    向量检索 --> 结果合并
+    关键词检索 --> 结果合并
+    结果合并 --> 结果评估
     
     结果评估 --> 结果充分?: 检查结果质量
     
     结果充分? --> 答案生成: 是
     结果充分? --> 查询重写: 否
     
-    查询重写 --> 检索
+    查询重写 --> 混合检索
     
     答案生成 --> 答案验证
     
@@ -99,6 +118,14 @@ stateDiagram-v2
     
     验证通过? --> [*]: 是
     验证通过? --> 查询重写: 否
+    
+    note right of 混合检索
+        检索策略：
+        - 向量相似度搜索
+        - ChromaDB全文检索
+        - 多关键词匹配
+        - 智能结果合并
+    end note
     
     note right of 查询重写
         重写策略：
@@ -122,177 +149,96 @@ stateDiagram-v2
 
 查询预处理负责清理和标准化用户输入，提取关键信息：
 
-```python
-def preprocess_query_node(state: ConversationState) -> ConversationState:
-    """预处理查询节点"""
-    query = state.question
-    
-    # 清理和标准化查询
-    cleaned_query = clean_and_normalize_query(query)
-    
-    # 提取关键词
-    keywords = extract_keywords(cleaned_query)
-    
-    # 检测查询意图
-    intent = detect_query_intent(cleaned_query)
-    
-    # 评估查询复杂度
-    complexity = assess_query_complexity(cleaned_query)
-    
-    # 根据复杂度调整处理参数
-    processing_params = adjust_processing_parameters(complexity)
-    
-    state.processed_question = cleaned_query
-    state.metadata.update({
-        'keywords': keywords,
-        'intent': intent,
-        'complexity': complexity,
-        'processing_params': processing_params
-    })
-    
-    return state
-```
+- **查询清理和标准化**：去除无关字符，统一格式
+- **关键词提取**：识别查询中的核心关键词
+- **意图检测**：分析用户查询的意图类型
+- **复杂度评估**：评估查询的复杂程度
+- **参数调整**：根据复杂度动态调整处理参数
 
 ### 文档检索
 
-基于向量相似度的文档检索，支持语义搜索和MMR算法：
+基于ChromaDB的混合检索系统，结合向量搜索和全文检索：
 
-```python
-def retrieve_node(state: ConversationState) -> ConversationState:
-    """检索节点"""
-    query = state.processed_question or state.question
-    
-    # 执行向量检索
-    retrieval_manager = RetrievalManager()
-    
-    # 语义搜索
-    semantic_results = retrieval_manager.semantic_search(
-        query=query,
-        top_k=10,
-        similarity_threshold=0.7
-    )
-    
-    # MMR检索（最大边际相关性）
-    mmr_results = retrieval_manager.mmr_search(
-        query=query,
-        documents=semantic_results,
-        lambda_mult=0.7,
-        k=5
-    )
-    
-    # 文档相关性评分
-    scored_docs = []
-    for doc in mmr_results:
-        relevance_score = calculate_document_relevance(query, doc)
-        llm_score = llm_document_scorer(query, doc)
-        
-        final_score = 0.7 * relevance_score + 0.3 * llm_score
-        scored_docs.append((doc, final_score))
-    
-    # 按分数排序并过滤
-    scored_docs.sort(key=lambda x: x[1], reverse=True)
-    filtered_docs = [doc for doc, score in scored_docs if score > 0.6]
-    
-    state.retrieved_docs = filtered_docs[:5]
-    return state
-```
+- **混合检索策略**：同时执行向量搜索和关键词搜索
+- **智能权重分配**：向量搜索权重0.7，关键词搜索权重0.3
+- **结果合并去重**：智能合并多种检索结果，去除重复文档
+- **综合评分排序**：结合向量相似度和关键词匹配分数
+- **质量过滤**：过滤低质量结果，确保检索精度
+
+#### ChromaDB全文检索特性
+
+- **原生全文检索**：ChromaDB内置全文检索引擎，无需外部依赖
+- **多关键词匹配**：支持复杂的关键词组合查询
+- **智能分词**：自动处理中英文分词和标准化
+- **相关性评分**：基于TF-IDF和BM25算法的相关性计算
+- **条件查询**：支持内容、标题、摘要等多字段匹配
+- **分数融合**：结合向量距离和关键词匹配分数
 
 ### 查询重写
 
-当检索结果不理想时，系统会重写查询以提升检索效果：
+当检索结果不充分时，系统会智能重写查询以提高检索效果：
 
-```python
-def rewrite_node(state: ConversationState) -> ConversationState:
-    """查询重写节点"""
-    original_query = state.question
-    retrieved_docs = state.retrieved_docs
-    
-    # 分析检索失败的原因
-    failure_reason = analyze_retrieval_failure(original_query, retrieved_docs)
-    
-    # 根据失败原因选择重写策略
-    if failure_reason == "too_specific":
-        rewritten_query = generalize_query(original_query)
-    elif failure_reason == "too_general":
-        rewritten_query = add_query_specificity(original_query)
-    elif failure_reason == "missing_context":
-        rewritten_query = add_context_to_query(original_query, state.chat_history)
-    else:
-        rewritten_query = expand_query_with_synonyms(original_query)
-    
-    state.rewritten_query = rewritten_query
-    return state
-```
+- **缺陷分析**：分析当前检索结果的不足之处
+- **策略选择**：根据分析结果选择合适的重写策略
+- **具体性增强**：为过于宽泛的查询增加具体性
+- **查询泛化**：为过于狭窄的查询进行泛化处理
+- **关键词扩展**：补充缺失的相关关键词
+- **迭代优化**：记录重写次数和策略，避免无限循环
 
 ### 答案生成
 
 基于检索到的文档生成高质量答案：
 
-```python
-def generate_node(state: ConversationState) -> ConversationState:
-    """生成答案节点"""
-    query = state.rewritten_query or state.processed_question or state.question
-    docs = state.retrieved_docs
-    
-    # 构建上下文
-    context = "\n\n".join([doc.page_content for doc in docs])
-    
-    # 构建提示模板
-    prompt = f"""
-    基于以下上下文信息，回答用户的问题。请确保答案准确、完整且相关。
-    
-    上下文：
-    {context}
-    
-    问题：{query}
-    
-    答案：
-    """
-    
-    # 调用LLM生成答案
-    llm = ChatOpenAI(model="gpt-4", temperature=0.1)
-    response = llm.invoke(prompt)
-    
-    state.answer = response.content
-    return state
-```
+- **上下文构建**：整合检索到的相关文档内容
+- **提示词优化**：构建结构化的提示词模板
+- **LLM调用**：使用大语言模型生成答案
+- **置信度计算**：评估答案的可信度和质量
+- **答案优化**：确保答案的准确性、完整性和实用性
 
 ### 答案验证
 
-验证生成答案的质量和相关性：
+对生成的答案进行质量检查和验证：
 
-```python
-def validate_node(state: ConversationState) -> ConversationState:
-    """验证答案节点"""
-    question = state.question
-    answer = state.answer
-    docs = state.retrieved_docs
-    
-    # 相关性验证
-    relevance_score = validate_answer_relevance(question, answer)
-    
-    # 完整性验证
-    completeness_score = validate_answer_completeness(question, answer)
-    
-    # 基于文档的事实性验证
-    factuality_score = validate_answer_factuality(answer, docs)
-    
-    # 计算综合验证分数
-    overall_score = (
-        0.4 * relevance_score + 
-        0.3 * completeness_score + 
-        0.3 * factuality_score
-    )
-    
-    state.validation_score = {
-        'relevance': relevance_score,
-        'completeness': completeness_score,
-        'factuality': factuality_score,
-        'overall': overall_score
-    }
-    
-    return state
-```
+- **相关性检查**：验证答案与用户问题的相关程度
+- **完整性检查**：确保答案充分回答了用户的问题
+- **准确性检查**：验证答案内容与源文档的一致性
+- **综合评分**：结合多个维度计算答案质量分数
+- **阈值判断**：基于质量分数决定是否接受答案或重新处理
+
+### 系统输出格式
+
+系统采用结构化的JSON格式输出，包含LLM回答和详细的参考数据块：
+
+**输出结构说明：**
+- **answer**：LLM生成的最终答案
+- **reference_blocks**：参考文档块列表，包含内容、来源、相关性得分等
+- **confidence_score**：答案置信度分数
+- **processing_time**：处理耗时
+- **metadata**：包含查询信息、检索统计、会话数据等元信息
+
+#### 输出格式说明
+
+**JSON结构包含以下字段：**
+- **answer**: 字符串，LLM生成的最终答案
+- **reference_chunks**: 数组，包含相关文档块的详细信息
+  - chunk_id: 文档块编号
+  - content: 文档块内容
+  - source: 来源文件名
+  - relevance_score: 相关性得分(0-1)
+  - is_relevant: 是否相关的布尔值
+  - metadata: 包含文件路径、页码、章节等详细元数据
+- **confidence_score**: 数值，答案置信度(0-1)
+- **processing_time**: 数值，处理耗时(秒)
+- **metadata**: 对象，包含查询统计、会话信息等元数据
+
+#### 示例输出
+
+系统会返回包含以下信息的JSON响应：
+- 基于检索文档生成的详细答案
+- 相关文档块的内容和来源信息
+- 每个文档块的相关性评分和推理说明
+- 整体的置信度分数和处理时间
+- 完整的查询处理元数据和统计信息
 
 ## 文档处理
 
@@ -300,95 +246,45 @@ def validate_node(state: ConversationState) -> ConversationState:
 
 基于语义相似度的智能文档分块：
 
-```python
-class HybridSemanticChunker:
-    def __init__(self, chunk_size: int = 1000, overlap: int = 200):
-        self.chunk_size = chunk_size
-        self.overlap = overlap
-        self.embeddings = OpenAIEmbeddings()
-    
-    def chunk_by_semantics(self, document: Document) -> List[Document]:
-        """基于语义相似度进行分块"""
-        content = document.page_content
-        
-        # 按段落分割
-        paragraphs = self._split_by_paragraphs(content)
-        
-        # 计算段落嵌入
-        embeddings = self._get_embeddings(paragraphs)
-        
-        # 基于相似度聚类
-        chunks = self._cluster_by_similarity(paragraphs, embeddings)
-        
-        # 转换为Document对象
-        documents = []
-        for i, chunk in enumerate(chunks):
-            doc = Document(
-                page_content=chunk,
-                metadata={
-                    **document.metadata,
-                    'chunk_id': i,
-                    'chunk_type': 'semantic'
-                }
-            )
-            documents.append(doc)
-        
-        return documents
-```
+- **段落分割**：将文档按段落进行初步分割
+- **嵌入计算**：为每个段落计算向量嵌入
+- **相似度聚类**：基于语义相似度将段落聚合成块
+- **文档转换**：将分块结果转换为标准Document对象
+- **元数据保留**：保持原始文档的元数据信息
 
 ### 结构化分块
 
 保持文档结构的分块处理：
 
-```python
-class StructuredChunker:
-    def chunk_by_structure(self, document: Document) -> List[Document]:
-        """基于文档结构进行分块"""
-        content = document.page_content
-        content_type = document.metadata.get('content_type', 'text')
-        
-        if content_type == 'markdown':
-            return self._chunk_markdown(content, document.metadata)
-        elif content_type == 'html':
-            return self._chunk_html(content, document.metadata)
-        else:
-            return self._chunk_plain_text(content, document.metadata)
-```
+- **Markdown分块**：基于标题层级进行结构化分块
+- **HTML分块**：按HTML标签结构进行分块处理
+- **纯文本分块**：基于段落和换行符进行分块
+- **格式保留**：维护原始文档的格式和结构信息
+- **类型识别**：自动识别文档类型并选择合适的分块策略
 
 ### 元数据处理
 
 文档元数据提取和增强：
 
-```python
-class MetadataAwareSemanticChunker:
-    def chunk_with_metadata(self, document: Document) -> List[Document]:
-        """结合元数据的语义分块"""
-        # 提取文档元数据
-        metadata = self._extract_metadata(document)
-        
-        # 基于元数据调整分块策略
-        chunk_strategy = self._determine_chunk_strategy(metadata)
-        
-        # 执行分块
-        chunks = self._execute_chunking(document, chunk_strategy)
-        
-        # 增强元数据
-        enhanced_chunks = []
-        for chunk in chunks:
-            enhanced_metadata = self._enhance_metadata(chunk, metadata)
-            chunk.metadata.update(enhanced_metadata)
-            enhanced_chunks.append(chunk)
-        
-        return enhanced_chunks
-```
+- **元数据提取**：自动提取文档的基础元数据信息
+- **策略调整**：基于元数据动态调整分块策略
+- **分块执行**：根据选定策略执行文档分块
+- **元数据增强**：为每个分块添加丰富的元数据
+- **信息整合**：将原始元数据与增强信息进行整合
 
 ## 技术栈
 
 ### 核心框架
 - **LangGraph**: 状态图管理和工作流编排
 - **LangChain**: LLM集成和文档处理
-- **ChromaDB**: 向量数据库和检索
+- **ChromaDB**: 向量数据库和全文检索（基于SQLite FTS5）
 - **OpenAI**: 大语言模型服务
+
+### 检索技术
+- **向量检索**: 基于OpenAI embeddings的语义相似度搜索
+- **全文检索**: ChromaDB原生where_document全文搜索
+- **混合检索**: 结合向量搜索和关键词匹配的综合检索
+- **多关键词匹配**: 要求每个结果至少匹配两个关键词
 
 ### 文档处理
 - **pdfplumber**: PDF文档解析
@@ -493,7 +389,8 @@ agent/
 ├── src/                       # 源代码目录
 │   ├── conversation_graph/    # LangGraph对话图
 │   │   ├── main_langgraph.py # 主图构建
-│   │   ├── retrieval_manager.py # 检索管理
+│   │   ├── self_corrective_rag.py # 自我纠错RAG
+│   │   ├── state.py          # 状态定义
 │   │   └── nodes/            # 处理节点
 │   │       ├── preprocessing.py # 预处理节点
 │   │       ├── retrieval.py     # 检索节点
@@ -501,13 +398,28 @@ agent/
 │   │       ├── generation.py    # 生成节点
 │   │       └── validation.py    # 验证节点
 │   │
+│   ├── retrieval/             # 检索系统
+│   │   ├── advanced_retrieval_manager.py # 高级检索管理
+│   │   └── chroma_hybrid_retriever.py    # ChromaDB混合检索
+│   │
 │   ├── document_processing/   # 文档处理
 │   │   ├── semantic_chunker.py  # 语义分块
-│   │   └── structured_chunker.py # 结构化分块
+│   │   ├── structured_chunker.py # 结构化分块
+│   │   └── loaders/          # 文档加载器
 │   │
-│   └── metadata/              # 元数据管理
-│       ├── metadata_extractor.py # 元数据提取
-│       └── metadata_enhancer.py  # 元数据增强
+│   ├── metadata/              # 元数据管理
+│   │   ├── metadata_extractor.py # 元数据提取
+│   │   ├── metadata_enhancer.py  # 元数据增强
+│   │   └── metadata_aware_semantic_chunker.py # 元数据感知分块
+│   │
+│   ├── core/                  # 核心组件
+│   │   ├── config_manager.py # 配置管理
+│   │   ├── prompt_manager.py # 提示管理
+│   │   └── retriever_factory.py # 检索器工厂
+│   │
+│   └── shared/                # 共享工具
+│       ├── utils.py          # 通用工具
+│       └── text_utils.py     # 文本处理工具
 │
 ├── documents/                 # 文档存储目录
 ├── chroma_db/                # ChromaDB数据目录
