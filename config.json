@@ -135,5 +135,71 @@
     "knowledge_docs_path": "${KNOWLEDGE_DOCS_PATH:./rules}",
     "vector_store_path": "${VECTOR_STORE_PATH:./vector_store}",
     "logs_path": "${LOGS_PATH:./logs}"
+  },
+  "advanced_retrieval": {
+    "hybrid_search": {
+      "vector_weight": 0.7,
+      "keyword_weight": 0.3,
+      "min_score_threshold": 0.1,
+      "max_results": 20,
+      "enable_reranking": true,
+      "enable_keyword_boost": true
+    },
+    "multi_query": {
+      "num_queries": 3,
+      "enable_query_rewrite": true,
+      "max_query_length": 200,
+      "temperature": 0.3,
+      "enable": true,
+      "max_docs_per_query": 10
+    },
+    "query_rewrite": {
+      "enable_keyword_extraction": true,
+      "enable_semantic_expansion": true,
+      "max_keywords": 10,
+      "similarity_threshold": 0.8
+    },
+    "reranking": {
+      "enable_content_similarity": true,
+      "enable_diversity_filter": true,
+      "diversity_threshold": 0.85,
+      "max_final_results": 10,
+      "score_weights": {
+        "relevance": 0.4,
+        "content_similarity": 0.3,
+        "diversity": 0.3
+      },
+      "top_k": 5,
+      "enable": true
+    },
+    "fallback_strategy": {
+      "enable_fallback": true,
+      "min_results_threshold": 3,
+      "fallback_search_types": ["vector", "keyword"],
+      "expand_search_params": {
+        "increase_k_factor": 2.0,
+        "reduce_score_threshold": 0.5
+      }
+    },
+    "performance": {
+      "enable_monitoring": true,
+      "cache_results": true,
+      "cache_ttl_seconds": 300,
+      "max_cache_size": 1000,
+      "log_performance_metrics": true
+    },
+    "strategy_selection": {
+      "auto_select": true,
+      "query_length_thresholds": {
+        "short": 20,
+        "medium": 100,
+        "long": 200
+      },
+      "keyword_count_thresholds": {
+        "few": 3,
+        "many": 8
+      },
+      "default_strategy": "hybrid"
+    }
   }
 }

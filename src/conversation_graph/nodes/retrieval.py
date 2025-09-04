@@ -6,13 +6,15 @@
 import logging
 from datetime import datetime
 from typing import Dict, Any, List
+
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 
 from ..state import SelfCorrectiveRAGState, DocumentGrade
-from ..utils import create_rules_retriever, get_llm_client, parse_relevance_score
-from ..retrieval_manager import calculate_retrieval_quality
+from ...core.retriever_factory import create_rules_retriever
+from ..utils import get_llm_client, parse_relevance_score
 from ...core.prompt_manager import prompt_manager
+from ...retrieval import get_advanced_retrieval_manager
 
 
 def intelligent_retrieval_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
@@ -44,12 +46,13 @@ def intelligent_retrieval_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
                 "retrieval_attempts": state.get("retrieval_attempts", 0) + 1
             }
         
-        # 创建检索器
-        retriever = create_rules_retriever(k=retrieval_k)
-        
-        if not retriever:
+        # 获取高级检索管理器
+        try:
+            advanced_manager = get_advanced_retrieval_manager()
+        except Exception as e:
+            logging.error(f"无法获取高级检索管理器: {str(e)}")
             return {
-                "error_message": "无法创建文档检索器",
+                "error_message": "无法创建高级检索管理器",
                 "retrieved_documents": [],
                 "retrieval_score": 0.0,
                 "retrieval_attempts": state.get("retrieval_attempts", 0) + 1
@@ -59,44 +62,35 @@ def intelligent_retrieval_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
         retrieval_attempts = state.get("retrieval_attempts", 0) + 1
         
         # 在向量查询开始前输出详细日志
-        logging.info("=== 开始向量查询 ===")
+        logging.info("=== 开始智能检索 ===")
         logging.info(f"查询文本: {query}")
-        logging.info(f"关键词列表: {keywords}")
+        logging.info(f"检索节点 - 使用预处理阶段提取的关键词: {keywords}")
         logging.info(f"复杂度级别: {complexity_level}")
         logging.info(f"retrieval_k 参数: {retrieval_k}")
         logging.info(f"检索尝试次数: {retrieval_attempts}")
         logging.info(f"当前时间戳: {datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
         logging.info("===================")
         
-        # 执行基础检索
-        documents = retriever.invoke(query)
-        
-        # 如果基础检索结果不足，尝试关键词检索
-        if len(documents) < 3 and keywords:
-            keyword_query = " ".join(keywords)
-            additional_docs = retriever.invoke(keyword_query)
-            
-            # 合并文档，去重
-            seen_content = {doc.page_content for doc in documents}
-            for doc in additional_docs:
-                if doc.page_content not in seen_content:
-                    documents.append(doc)
-                    seen_content.add(doc.page_content)
-        
-        # 根据复杂度进行文档过滤和排序
-        filtered_documents = filter_and_rank_documents(
-            documents, query, keywords, complexity_level
+        # 使用高级检索管理器执行智能检索
+        search_result = advanced_manager.intelligent_search(
+            query=query,
+            k=retrieval_k,
+            keywords=keywords
         )
         
-        # 计算检索质量分数
-        retrieval_score = calculate_retrieval_quality(query, filtered_documents)
+        filtered_documents = search_result['documents']
+        retrieval_score = search_result['quality_score']
+        
+        # 记录检索策略和结果
+        logging.info(f"使用检索策略: {search_result.get('strategy', 'unknown')}")
+        logging.info(f"检索到 {len(filtered_documents)} 个文档，质量分数: {retrieval_score:.3f}")
         
         return {
             "retrieved_documents": filtered_documents,
             "retrieval_score": retrieval_score,
             "retrieval_attempts": retrieval_attempts,
             "retrieval_metadata": {
-                "original_doc_count": len(documents),
+                "original_doc_count": len(search_result.get('original_documents', filtered_documents)),
                 "filtered_doc_count": len(filtered_documents),
                 "retrieval_strategy": "hybrid" if keywords else "semantic",
                 "complexity_level": complexity_level

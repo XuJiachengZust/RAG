@@ -19,10 +19,15 @@ from .nodes import (
     correct_answer_node
 )
 from .utils import (
-    create_rules_retriever,
     evaluate_answer_quality
 )
-from .retrieval_manager import calculate_retrieval_quality
+# 检索器创建函数已移动到 src.core.retriever_factory
+from ..core.retriever_factory import (
+    create_rules_retriever,
+    create_advanced_retriever,
+    create_next_gen_retriever
+)
+# 旧的检索管理器已被移除，质量计算功能已集成到新的高级检索管理器中
 
 __all__ = [
     'SelfCorrectiveRAGState',
@@ -35,6 +40,8 @@ __all__ = [
     'validate_answer_node',
     'correct_answer_node',
     'create_rules_retriever',
-    'calculate_retrieval_quality',
+    'create_advanced_retriever',
+    'create_next_gen_retriever',
+    # 'calculate_retrieval_quality',  # 已集成到新的高级检索管理器中
     'evaluate_answer_quality'
 ]

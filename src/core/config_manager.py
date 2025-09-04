@@ -159,11 +159,72 @@ class ConfigManager:
                 "enable_query_rewriting": True
             },
             "node_models": {
-                "generation_model": os.getenv("GENERATION_MODEL", "gpt-4o-mini"),
-                "validation_model": os.getenv("VALIDATION_MODEL", "gpt-4o-mini"),
-                "correction_model": os.getenv("CORRECTION_MODEL", "gpt-4o-mini"),
-                "rewrite_model": os.getenv("REWRITE_MODEL", "gpt-3.5-turbo"),
-                "grading_model": os.getenv("GRADING_MODEL", "gpt-3.5-turbo")
+                "retrieval_grader": "${RETRIEVAL_GRADER_MODEL:gpt-4o-mini}",
+                "hallucination_grader": "${HALLUCINATION_GRADER_MODEL:gpt-4o-mini}",
+                "answer_grader": "${ANSWER_GRADER_MODEL:gpt-4o-mini}",
+                "question_rewriter": "${QUESTION_REWRITER_MODEL:gpt-4o-mini}",
+                "generator": "${GENERATOR_MODEL:gpt-4o-mini}"
+            },
+            "advanced_retrieval": {
+                "hybrid_search": {
+                    "vector_weight": 0.7,
+                    "keyword_weight": 0.3,
+                    "min_score_threshold": 0.1,
+                    "max_results": 20,
+                    "enable_reranking": True
+                },
+                "multi_query": {
+                    "num_queries": 3,
+                    "enable_query_rewrite": True,
+                    "max_query_length": 200,
+                    "temperature": 0.3
+                },
+                "query_rewrite": {
+                    "enable_keyword_extraction": True,
+                    "enable_semantic_expansion": True,
+                    "max_keywords": 10,
+                    "similarity_threshold": 0.8
+                },
+                "reranking": {
+                    "enable_content_similarity": True,
+                    "enable_diversity_filter": True,
+                    "diversity_threshold": 0.85,
+                    "max_final_results": 10,
+                    "score_weights": {
+                        "relevance": 0.4,
+                        "content_similarity": 0.3,
+                        "diversity": 0.3
+                    }
+                },
+                "fallback_strategy": {
+                    "enable_fallback": True,
+                    "min_results_threshold": 3,
+                    "fallback_search_types": ["vector", "keyword"],
+                    "expand_search_params": {
+                        "increase_k_factor": 2.0,
+                        "reduce_score_threshold": 0.5
+                    }
+                },
+                "performance": {
+                    "enable_monitoring": True,
+                    "cache_results": True,
+                    "cache_ttl_seconds": 300,
+                    "max_cache_size": 1000,
+                    "log_performance_metrics": True
+                },
+                "strategy_selection": {
+                    "auto_select": True,
+                    "query_length_thresholds": {
+                        "short": 20,
+                        "medium": 100,
+                        "long": 200
+                    },
+                    "keyword_count_thresholds": {
+                        "few": 3,
+                        "many": 8
+                    },
+                    "default_strategy": "hybrid"
+                }
             }
         }
     

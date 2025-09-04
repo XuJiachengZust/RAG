@@ -1,6 +1,7 @@
 """自我纠错RAG系统的工具函数
 
-包含检索器创建、质量评估、文本处理等辅助功能。
+包含质量评估、文本处理等辅助功能。
+检索器创建功能已移动到 src.core.retriever_factory 模块。
 """
 
 import os
@@ -8,121 +9,46 @@ import re
 import time
 from typing import List, Dict, Any, Optional
 from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
 from src.core.config_manager import ConfigManager
-from .document_initializer import get_document_initializer, get_rules_retriever
-from .retrieval_manager import get_retrieval_manager
+# 导入独立的文本处理工具
+from src.shared.text_utils import clean_text
 
 
-def create_rules_retriever(rules_directory: str = "./rules", k: int = 5):
-    """
-    创建一个用于检索rules文件的retriever
-    使用RetrievalManager来管理检索逻辑，与初始化逻辑分离
-    
-    Args:
-        rules_directory: rules文件目录路径
-        k: 返回的文档数量
-    
-    Returns:
-        配置好的retriever
-    """
-    try:
-        # 获取或创建文档初始化器（只在需要时初始化）
-        config = {
-            'rules_directory': rules_directory,
-            'vector_store_path': './chroma_db_rules'
-        }
-        
-        initializer = get_document_initializer(config)
-        
-        # 检查是否需要初始化（避免重复初始化）
-        if not initializer.vector_store or initializer._should_reload():
-            print("正在初始化文档库...")
-            stats = initializer.initialize()
-            
-            if not stats.get('success', True) and stats.get('errors'):
-                print(f"文档初始化警告: {len(stats['errors'])} 个错误")
-                for error in stats['errors'][:3]:  # 只显示前3个错误
-                    print(f"  - {error}")
-        else:
-            print("文档库已初始化，跳过重复初始化")
-        
-        # 使用RetrievalManager获取检索器
-        retrieval_manager = get_retrieval_manager(initializer)
-        return retrieval_manager.get_retriever(k)
-        
-    except Exception as e:
-        print(f"创建rules retriever失败: {str(e)}")
-        # 回退到快捷方式
-        try:
-            return get_rules_retriever(k)
-        except Exception:
-            return None
+# 检索器创建函数已移动到 src.core.retriever_factory 模块
+# 请使用以下导入：
+# from src.core.retriever_factory import create_rules_retriever, create_advanced_retriever, create_next_gen_retriever
 
 
-def create_advanced_retriever(rules_directory: str = "./rules", 
-                             search_type: str = "similarity",
-                             k: int = 5,
-                             search_kwargs: Dict[str, Any] = None):
-    """
-    创建高级检索器，支持多种检索策略
-    
-    Args:
-        rules_directory: rules文件目录路径
-        search_type: 检索类型 (similarity, mmr, similarity_score_threshold)
-        k: 返回的文档数量
-        search_kwargs: 额外的检索参数
-    
-    Returns:
-        配置好的高级检索器
-    """
-    try:
-        # 获取或创建文档初始化器
-        config = {
-            'rules_directory': rules_directory,
-            'vector_store_path': './chroma_db_rules'
-        }
-        
-        initializer = get_document_initializer(config)
-        
-        # 检查是否需要初始化
-        if not initializer.vector_store or initializer._should_reload():
-            print("正在初始化文档库...")
-            stats = initializer.initialize()
-            
-            if not stats.get('success', True) and stats.get('errors'):
-                print(f"文档初始化警告: {len(stats['errors'])} 个错误")
-        else:
-            print("文档库已初始化，跳过重复初始化")
-        
-        # 使用RetrievalManager获取高级检索器
-        retrieval_manager = get_retrieval_manager(initializer)
-        return retrieval_manager.get_retriever(k, search_type, search_kwargs)
-        
-    except Exception as e:
-        print(f"创建高级检索器失败: {str(e)}")
-        return None
+
+
+
+
 
 
 def retrieve_documents_with_quality(query: str,
-                                   rules_directory: str = "./rules",
-                                   k: int = 5,
-                                   quality_threshold: float = 0.0) -> Dict[str, Any]:
+                                    rules_directory: str = "./rules",
+                                    k: int = 5,
+                                    quality_threshold: float = 0.7,
+                                    use_advanced: bool = True) -> Dict[str, Any]:
     """
-    检索文档并返回质量评估结果
+    检索文档并进行质量评估
     
     Args:
-        query: 查询文本
+        query: 查询字符串
         rules_directory: rules文件目录路径
         k: 返回的文档数量
         quality_threshold: 质量阈值
+        use_advanced: 是否使用高级检索器
     
     Returns:
-        包含文档、质量分数和元数据的字典
+        包含文档和质量评估的字典
     """
     try:
-        # 获取或创建文档初始化器
+        # 使用新的检索器工厂
+        from src.core.retriever_factory import create_next_gen_retriever
+        from src.core.document_initializer import get_document_initializer
+        
+        # 获取文档初始化器
         config = {
             'rules_directory': rules_directory,
             'vector_store_path': './chroma_db_rules'
@@ -133,24 +59,132 @@ def retrieve_documents_with_quality(query: str,
         # 检查是否需要初始化
         if not initializer.vector_store or initializer._should_reload():
             print("正在初始化文档库...")
-            initializer.initialize()
+            stats = initializer.initialize()
+            
+            if not stats.get('success', True) and stats.get('errors'):
+                print(f"文档初始化警告: {len(stats['errors'])} 个错误")
         
-        # 使用RetrievalManager进行检索
-        retrieval_manager = get_retrieval_manager(initializer)
-        return retrieval_manager.retrieve_documents(
-            query=query,
-            k=k,
-            quality_threshold=quality_threshold
-        )
+        # 使用高级检索管理器
+        try:
+            from src.retrieval import get_advanced_retrieval_manager
+            advanced_manager = get_advanced_retrieval_manager()
+            
+            # 执行检索
+            result = advanced_manager.intelligent_search(
+                query=query,
+                k=k,
+                quality_threshold=quality_threshold
+            )
+            documents = result.get('documents', [])
+            
+            # 评估整体质量
+            overall_quality = evaluate_documents_quality(query, documents)
+            
+            return {
+                'documents': documents,
+                'query': query,
+                'quality_score': overall_quality,
+                'retrieval_stats': {
+                    'total_retrieved': len(documents),
+                    'quality_threshold': quality_threshold,
+                    'use_advanced': use_advanced
+                }
+            }
+        except ImportError:
+            # 回退到基础检索
+            retriever = create_next_gen_retriever(rules_directory, k=k)
+            if retriever:
+                documents = retriever.get_relevant_documents(query)
+            else:
+                documents = []
+            
+            # 简单质量评估
+            quality_score = sum(1 for doc in documents if len(doc.page_content) > 50) / len(documents) if documents else 0
+            
+            return {
+                'documents': documents,
+                'query': query,
+                'quality_score': quality_score,
+                'retrieval_stats': {
+                    'total_retrieved': len(documents),
+                    'quality_threshold': quality_threshold,
+                    'use_advanced': False
+                }
+            }
         
     except Exception as e:
         print(f"文档检索失败: {str(e)}")
         return {
             'documents': [],
-            'quality_score': 0.0,
             'query': query,
-            'error': str(e)
+            'quality_score': 0.0,
+            'retrieval_stats': {
+                'total_retrieved': 0,
+                'quality_threshold': quality_threshold,
+                'use_advanced': use_advanced,
+                'error': str(e)
+            }
         }
+
+
+def evaluate_documents_quality(query: str, documents: list) -> float:
+    """评估检索文档质量
+    
+    基于文档相关性、内容长度、多样性等因素评估检索文档的整体质量。
+    
+    Args:
+        query: 用户查询
+        documents: 检索到的文档列表
+        
+    Returns:
+        质量分数 (0-1)
+    """
+    if not documents:
+        return 0.0
+    
+    total_score = 0.0
+    
+    for doc in documents:
+        doc_content = doc.page_content if hasattr(doc, 'page_content') else str(doc)
+        
+        # 1. 文档长度评分 (理想长度为100-1000字符)
+        content_length = len(doc_content)
+        if 100 <= content_length <= 1000:
+            length_score = 1.0
+        elif content_length < 100:
+            length_score = content_length / 100
+        else:
+            length_score = max(0.6, 1000 / content_length)
+        
+        # 2. 查询相关性评分
+        try:
+            query_terms = set(clean_text(query).lower().split())
+            doc_terms = set(clean_text(doc_content).lower().split())
+            
+            if query_terms and doc_terms:
+                relevance_score = len(query_terms.intersection(doc_terms)) / len(query_terms)
+            else:
+                relevance_score = 0.0
+        except:
+            relevance_score = 0.0
+        
+        # 3. 内容质量评分 (基于内容丰富度)
+        if doc_content and doc_content.strip():
+            quality_score = min(1.0, len(doc_content.split()) / 50)  # 50词为满分
+        else:
+            quality_score = 0.0
+        
+        # 综合评分：长度30%，相关性50%，质量20%
+        doc_score = (
+            length_score * 0.3 +
+            relevance_score * 0.5 +
+            quality_score * 0.2
+        )
+        
+        total_score += doc_score
+    
+    # 返回平均分数
+    return min(total_score / len(documents), 1.0)
 
 
 def evaluate_answer_quality(query: str, context: str, answer: str) -> float:
@@ -214,8 +248,10 @@ def evaluate_answer_quality(query: str, context: str, answer: str) -> float:
     return min(final_score, 1.0)
 
 
-def clean_text(text: str) -> str:
-    """清理文本，移除特殊字符和多余空格
+# 注意：clean_text 函数已移动到 src.shared.text_utils 模块
+# 这里保留一个简化版本以保持向后兼容性
+def clean_text_legacy(text: str) -> str:
+    """清理文本，移除特殊字符和多余空格（向后兼容版本）
     
     Args:
         text: 原始文本
@@ -316,7 +352,7 @@ def _extract_keywords_with_llm(text: str, max_keywords: int, llm_client) -> List
     """
     try:
         # 构建提示词
-        prompt = f"""请从以下文本中提取最重要的关键词。要求：
+        prompt = f"""请从以下文本中提取最重要功能关键词要求：
 1. 提取最多{max_keywords}个关键词
 2. 关键词应该是名词、动词或重要的形容词
 3. 优先选择专业术语、核心概念和重要实体

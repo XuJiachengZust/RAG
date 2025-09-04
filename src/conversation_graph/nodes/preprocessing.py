@@ -41,6 +41,7 @@ def preprocess_query_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
         
         # 2. 提取关键词
         keywords = extract_keywords(cleaned_query, max_keywords=8)
+        logging.info(f"预处理节点 - 提取的关键词: {keywords}")
         
         # 3. 检测查询类型和意图
         query_intent = detect_query_intent(cleaned_query)

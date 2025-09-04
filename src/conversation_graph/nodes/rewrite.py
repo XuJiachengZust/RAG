@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
 
 from ..state import SelfCorrectiveRAGState
-from ..utils import get_llm_client, extract_keywords, clean_text
+from ..utils import get_llm_client, clean_text
 from ...core.prompt_manager import prompt_manager
 
 
@@ -15,10 +15,10 @@ def rewrite_query_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
     """查询重写节点
     
     功能：
-    1. 分析原查询的检索失败原因
-    2. 生成改进的查询版本
-    3. 扩展查询关键词
-    4. 调整查询策略
+    1. 分析检索失败的原因
+    2. 根据失败原因选择重写策略
+    3. 生成重写后的查询
+    4. 评估重写质量
     
     Args:
         state: 当前状态
@@ -27,18 +27,22 @@ def rewrite_query_node(state: SelfCorrectiveRAGState) -> Dict[str, Any]:
         更新后的状态字典
     """
     try:
-        original_query = state.get("query", "")
-        retrieval_attempts = state.get("retrieval_attempts", 0)
+        query = state.get("query", "")
+        keywords = state.get("keywords", [])
+        retrieved_documents = state.get("retrieved_documents", [])
         graded_documents = state.get("graded_documents", [])
-        query_intent = state.get("query_intent", "general")
-        complexity_level = state.get("complexity_level", "medium")
+        retrieval_attempts = state.get("retrieval_attempts", 0)
+        max_retrieval_attempts = state.get("max_retrieval_attempts", 3)
         
-        if not original_query:
+        if not query:
             return {
-                "error_message": "原始查询为空，无法重写",
-                "rewritten_query": original_query,
-                "rewrite_strategy": "none"
+                "error_message": "查询为空，无法进行重写",
+                "rewritten_query": query,
+                "rewrite_applied": False
             }
+        
+        # 记录关键词使用情况
+        logging.info(f"查询重写节点 - 使用预处理阶段提取的关键词: {keywords}")
         
         # 分析检索失败原因
         failure_analysis = analyze_retrieval_failure(state)

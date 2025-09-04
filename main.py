@@ -38,12 +38,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  python main.py                    # 标准启动
+  python main.py                    # 标准启动（默认交互模式）
   python main.py --async            # 异步启动
   python main.py --force-reload     # 强制重新加载文档
   python main.py --rules-dir ./docs # 指定文档目录
   python main.py --no-docs          # 跳过文档初始化
-  python main.py --interactive      # 启动后进入交互模式
+  python main.py --no-interactive   # 禁用交互模式
         """
     )
     
@@ -54,8 +54,10 @@ def main():
                        help='强制重新加载所有文档')
     parser.add_argument('--no-docs', action='store_true', 
                        help='跳过文档初始化')
-    parser.add_argument('--interactive', action='store_true', 
-                       help='启动后进入交互模式')
+    parser.add_argument('--interactive', action='store_true', default=True,
+                       help='启动后进入交互模式（默认启用）')
+    parser.add_argument('--no-interactive', action='store_true', 
+                       help='禁用交互模式')
     
     # 配置选项
     parser.add_argument('--rules-dir', type=str, 
@@ -114,8 +116,8 @@ def main():
         
         print("\n[成功] 系统启动成功！")
         
-        # 如果启用交互模式
-        if args.interactive:
+        # 如果启用交互模式（默认启用，除非使用--no-interactive）
+        if args.interactive and not args.no_interactive:
             print("\n进入交互模式...")
             print("输入 'quit' 或 'exit' 退出")
             print("输入 'help' 查看可用命令")
@@ -192,7 +194,7 @@ def main():
         
         else:
             print("\n系统已就绪，可以开始使用。")
-            print("提示: 使用 --interactive 参数可启动交互模式")
+            print("提示: 默认启用交互模式，使用 --no-interactive 参数可禁用")
     
     except KeyboardInterrupt:
         print("\n\n启动被用户中断")

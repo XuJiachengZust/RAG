@@ -15,7 +15,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.core.config_manager import ConfigManager
-from src.conversation_graph.document_initializer import initialize_documents, get_document_initializer
+from src.core.document_initializer import initialize_documents, get_document_initializer
 
 logger = logging.getLogger(__name__)
 
