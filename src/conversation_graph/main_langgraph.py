@@ -270,34 +270,78 @@ class SelfCorrectiveRAGGraph:
             return self._format_result(error_state)
     
     def _format_result(self, state: SelfCorrectiveRAGState) -> Dict[str, Any]:
-        """格式化返回结果
+        """格式化返回结果为JSON结构
         
         Args:
             state: 最终状态
             
         Returns:
-            格式化的结果字典
+            包含LLM回答和参考数据chunk的JSON结构
         """
+        # 构建参考数据块
+        reference_chunks = []
+        
+        # 处理检索到的文档
+        retrieved_docs = state.get("retrieved_documents", [])
+        graded_docs = state.get("graded_documents", [])
+        
+        # 创建文档ID到评分的映射
+        doc_scores = {}
+        for graded_doc in graded_docs:
+            if isinstance(graded_doc, dict) and "document" in graded_doc:
+                doc_id = id(graded_doc["document"])
+                doc_scores[doc_id] = {
+                    "relevance_score": graded_doc.get("relevance_score", 0.0),
+                    "is_relevant": graded_doc.get("is_relevant", False),
+                    "reasoning": graded_doc.get("reasoning", "")
+                }
+        
+        # 构建参考数据块列表
+        for i, doc in enumerate(retrieved_docs):
+            doc_id = id(doc)
+            score_info = doc_scores.get(doc_id, {
+                "relevance_score": 0.0,
+                "is_relevant": False,
+                "reasoning": "未评分"
+            })
+            
+            chunk = {
+                "chunk_id": i + 1,
+                "content": doc.page_content[:1000] + "..." if len(doc.page_content) > 1000 else doc.page_content,
+                "source": doc.metadata.get("source", "未知来源"),
+                "relevance_score": score_info["relevance_score"],
+                "is_relevant": score_info["is_relevant"],
+                "metadata": {
+                    "file_path": doc.metadata.get("file_path", ""),
+                    "page": doc.metadata.get("page", ""),
+                    "section": doc.metadata.get("section", ""),
+                    "chunk_index": doc.metadata.get("chunk_index", i),
+                    "reasoning": score_info["reasoning"]
+                }
+            }
+            reference_chunks.append(chunk)
+        
         return {
             "answer": state["final_answer"],
+            "reference_chunks": reference_chunks,
             "confidence_score": state["confidence_score"],
             "processing_time": state.get("processing_time", 0),
-            "retrieval_attempts": state.get("retrieval_attempts", 0),
-            "generation_attempts": state.get("generation_attempts", 0),
-            "correction_history": state.get("correction_history", []),
-            "session_id": state.get("session_id"),
-            "timestamp": state.get("timestamp"),
-            "error_message": state.get("error_message"),
             "metadata": {
                 "original_query": state.get("original_query"),
                 "rewritten_queries": state.get("rewritten_queries", []),
                 "retrieval_score": state.get("retrieval_score", 0),
                 "answer_quality_score": state.get("answer_quality_score", 0),
-                "documents_count": len(state.get("retrieved_documents", [])),
+                "documents_count": len(retrieved_docs),
                 "relevant_documents_count": len([
-                    doc for doc in state.get("graded_documents", [])
+                    doc for doc in graded_docs
                     if doc.get("is_relevant", False)
-                ])
+                ]),
+                "retrieval_attempts": state.get("retrieval_attempts", 0),
+                "generation_attempts": state.get("generation_attempts", 0),
+                "correction_history": state.get("correction_history", []),
+                "session_id": state.get("session_id"),
+                "timestamp": state.get("timestamp"),
+                "error_message": state.get("error_message")
             }
         }
     

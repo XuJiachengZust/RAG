@@ -11,6 +11,7 @@ import os
 import sys
 import argparse
 import asyncio
+import json
 from pathlib import Path
 
 # 添加项目根目录到Python路径
@@ -166,10 +167,28 @@ def main():
                         try:
                             # 调用对话图处理用户输入
                             result = rag_graph.invoke(user_input)
+                            
+                            # 输出JSON格式的结果
+                            print("\n=== JSON 输出 ===")
+                            print(json.dumps(result, ensure_ascii=False, indent=2))
+                            print("=== JSON 输出结束 ===")
+                            
+                            # 同时提供友好的文本输出
                             answer = result.get('answer', '抱歉，我无法回答这个问题。')
                             confidence = result.get('confidence_score', 0)
+                            reference_chunks = result.get('reference_chunks', [])
                             
-                            print(f"助手: {answer}")
+                            print(f"\n助手: {answer}")
+                            
+                            # 显示参考信息
+                            if reference_chunks:
+                                print(f"\n[参考文档] 共找到 {len(reference_chunks)} 个相关文档片段:")
+                                for i, chunk in enumerate(reference_chunks[:3]):  # 只显示前3个
+                                    relevance = chunk.get('relevance_score', 0)
+                                    source = chunk.get('source', '未知来源')
+                                    print(f"  {i+1}. {source} (相关性: {relevance:.2f})")
+                                if len(reference_chunks) > 3:
+                                    print(f"  ... 还有 {len(reference_chunks) - 3} 个文档片段")
                             
                             # 显示置信度（如果较低则提醒用户）
                             if confidence < 0.7:
